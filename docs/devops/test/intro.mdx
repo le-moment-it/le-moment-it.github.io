@@ -1,0 +1,33 @@
+---
+sidebar_position: 1
+title: Test
+description: Introduction to DevOps concepts
+---
+
+import AsciinemaPlayerComponent from '@site/src/components/AsciinemaPlayer';
+import Terminal from '@site/src/components/Terminal';
+
+<AsciinemaPlayerComponent 
+  src="https://asciinema.org/a/569727.cast" 
+  options={{
+    markers: [
+      [5.0, "Installation"],
+      [25.0, "Configuration"], 
+      [45.0, "Usage Examples"]
+    ],
+    pauseOnMarkers: true
+  }}
+/>
+
+
+
+<Terminal  prompt="user@server:~$"
+  title="Setup Project"
+  lines={[
+    "mkdir my-project",
+    "cd my-project", 
+    "touch terragrunt.hcl",
+    "terragrunt init"
+  ]}
+/>
+

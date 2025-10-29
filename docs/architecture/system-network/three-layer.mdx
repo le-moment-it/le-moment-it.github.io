@@ -1,0 +1,125 @@
+---
+sidebar_position: 2
+title: Three-tier infrastructure
+description: Introduction to the three-tier infrastructure
+---
+
+## Introduction
+
+When designing a new system infrastructure or migrating an existing one, you may wonder how to organize your systems and network to support future evolution while maintaining strong security.
+
+In this documentation, I present a simple yet effective architecture known as the Three-tier infrastructure.
+
+:::note
+The `Three tier infrastructure` is an entry-level architecture suitable for small to medium-sized infrastructures without environment isolation. If you require environment isolation or have more complex needs, please refer to the [Hub And Spoc Infrastructure](./hub-and-spoc.mdx)
+:::
+
+## Tiers descriptions
+
+The three-tier infrastructure is built around three tiers, each serving a distinct purpose.
+
+- **Public tier** (Also called `DMZ`) : This is the layer exposed to the internet. It typically includes one or more subnets that host services publicly accessible from the internet. These services act as the first line of defense, protecting the inner tiers.
+Common components deployed here include:
+
+  - Loadbalancer / Reverse proxies
+  - Firewalls
+  - VPNs
+  ... 
+
+- **Private/Application tier** : The second tier hosts your application servers. These are typically services that interact with or serve content to the public tier. Any service that does not contain sensitive data (such as databases) should be deployed here.
+
+- **Database/Secret tier** : The third and most sensitive tier stores critical information such as databases and secret vaults. Data in this layer may or may not be accessible to applications deployed in the private tier, depending on your security design.
+
+Here’s how this architecture can be visualized, with example services deployed:
+
+![Three tier](/img/architecture/system-network/three-tier/introduction.drawio.svg)
+
+
+:::note A quick word about subnets
+In the diagram above, subnet configuration within each tier is not detailed.
+In a cloud deployment, it is generally recommended to create multiple subnets per tier across different availability zones to ensure high availability for compatible resources.
+:::
+
+## Why choose this architecture ?
+
+Let’s explore the main advantages and limitations of the three-tier architecture.
+
+### Advantages
+
+#### Simple implementation
+
+The three-tier model is one of the simplest architectures to deploy. It requires minimal networking expertise and can scale easily with little maintenance effort.
+Many Infrastructure as Code (IaC) tools, such as Terraform, provide [ready-to-use modules]((https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest)) to quickly create a three-tier network. For example:
+
+```hcl title="VPC module instanciation"
+module "vpc" {
+  source = "terraform-aws-modules/vpc/aws"
+
+  name = "my-vpc"
+  cidr = "10.0.0.0/16"
+
+  azs             = ["eu-west-1a", "eu-west-1b", "eu-west-1c"]
+  private_subnets = ["10.0.1.0/24", "10.0.2.0/24", "10.0.3.0/24"]
+  public_subnets  = ["10.0.101.0/24", "10.0.102.0/24", "10.0.103.0/24"]
+
+  enable_nat_gateway = true
+  enable_vpn_gateway = true
+
+  tags = {
+    Terraform = "true"
+    Environment = "dev"
+  }
+}
+```
+
+#### Cost effective
+
+Because of its simplicity, the three-tier architecture is cost-efficient. For example, in AWS, most of the necessary components — such as the VPC, subnets, and security groups — are free or included in the cloud infrastructure. The main paid component is the NAT Gateway, which typically costs around €30 per month per gateway.
+
+Overall cost mainly depends on your use of cloud resources rather than the architecture itself.
+
+#### Built-in security
+
+The three-tier architecture provides a secure default framework for structuring your network.
+By applying the principle of least privilege — allowing each tier to access only what is strictly necessary — you significantly reduce exposure to common external threats like port scanning or brute-force attacks.
+
+
+:::note Cloud integration
+In some cloud platforms, you can connect external services to your internal network without using public endpoints.
+For example, in AWS, instances within a VPC can access S3 buckets securely using [VPC gateway endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html), which further strengthens network security.
+:::
+
+
+### Limitations
+
+#### Lack of environment isolation
+
+A key limitation of the three-tier architecture is that it does not inherently separate environments such as prod, qa, and dev.
+All resources are usually deployed within the same network (e.g., within a single VPC). This reduces your ability to fully isolate and protect each environment from potential cross-impact.
+
+If a misconfiguration or incident occurs, it may affect the entire infrastructure.
+
+:::note
+To achieve true environment isolation, each environment should have its own independent three-tier infrastructure.
+This approach is discussed in the next article : [Hub & Spoc Architecture](./hub-and-spoc.mdx)
+:::
+
+#### No dedicated shared resources
+
+Building on the previous limitation, this architecture does not easily support shared services that span multiple environments.
+
+  - Monitoring
+  - VCS
+  - Container registry
+  - ...
+
+#### Scaling
+
+As your system grows, the architecture’s simplicity can become a constraint.
+Managing numerous services and their network permissions (for example, complex [security group](https://docs.aws.amazon.com/vpc/latest/userguide/vpc-security-groups.html) rules) within a single three-tier setup can quickly become cumbersome.
+
+## Conclusion
+
+The three-tier architecture offers an easy-to-deploy entry-level infrastructure divided into three clearly defined tiers, each responsible for a specific function. It is particularly well-suited for new projects due to its simplicity and built-in security model.
+
+However, its limitations in scalability and environment isolation should be carefully considered when designing infrastructures intended for long-term growth or complex deployments.

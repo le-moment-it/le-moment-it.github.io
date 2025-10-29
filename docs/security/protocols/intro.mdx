@@ -1,0 +1,1215 @@
+---
+sidebar_position: 1
+title: mTLS
+description: mTLS introduction & workshop
+---
+
+import Terminal from '@site/src/components/Terminal';
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import FileTree from '@site/src/components/Filetree';
+
+## Introduction
+
+Mutual TLS, or mTLS for short, is a method for mutual authentication. mTLS ensures that the parties at each end of a network connection are who they claim to be by verifying that they both have the correct private key. The information within their respective TLS certificates provides additional verification.
+
+## Workshop
+
+### Context
+
+In this workshop, we have **client B** and **client C**. We want to connect them together using mTLS.
+The objective of this workshop is to create a communication `client B -> client C` using mTLS.
+
+These will be the following steps :
+
+- Generate CA Root Certificate for Client C
+- Generate CA Root Certificate for Client B
+- Generate Intermediate CA Certificate for Client C (optional)
+- Generate Intermediate CA Certificate for Client B (optional)
+- Generate CSR from Client B for Client C
+- Client C Signs CSR from CSR and returns the Certificate
+- Create Server Certificate for Client C
+
+### Step to step workshop
+
+#### STEP 1: Generate CA Root Certificate for Client C
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+  ```yaml title="Generate CA Root Certificate for Client C"
+  # Create directory structure for Client C CA
+  mkdir -p client_c_ca/{certs,private,csr}
+  cd client_c_ca
+
+  # Generate Client C root CA private key
+  openssl genrsa -aes256 -out private/client_c_root_ca.key 4096
+
+  # Generate Client C root CA certificate (self-signed)
+  openssl req -x509 -new -nodes -key private/client_c_root_ca.key -sha256 -days 3650 \
+    -out certs/client_c_root_ca.crt \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client C Organization/OU=IT Department/CN=Client C Root CA"
+  ```
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl x509 -in certs/client_c_root_ca.crt -text -noout"
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-1" label="FileTree" default>
+export const step1 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: []
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step1}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_c_root_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-1" label="Schema" default>
+    ![Step1](/img/security/protocols/mtls/step1.png)
+  </TabItem>
+</Tabs>
+
+
+
+#### STEP 2: Generate CA Root Certificate for Client B
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+  ```yaml title="Generate CA Root Certificate for Client B"
+  # Create directory structure for Client B CA
+  mkdir -p client_b_ca/{certs,private,csr}
+  cd client_b_ca
+
+  # Generate Client B root CA private key
+  openssl genrsa -aes256 -out private/client_b_root_ca.key 4096
+
+  # Generate Client B root CA certificate (self-signed)
+  openssl req -x509 -new -nodes -key private/client_b_root_ca.key -sha256 -days 3650 \
+    -out certs/client_b_root_ca.crt \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client B Organization/OU=IT Department/CN=Client B Root CA"
+  ```
+
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl x509 -in certs/client_b_root_ca.crt -text -noout"
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-2" label="FileTree" default>
+export const step2 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: []
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: []
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step2}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_b_root_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-2" label="Schema" default>
+    ![Step2](/img/security/protocols/mtls/step2.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 3: Generate Intermediate CA Certificate for Client C (optional)
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+  ```yaml title="Generate Intermediate CA Certificate for Client C"
+cd client_c_ca
+
+# Generate intermediate CA private key
+openssl genrsa -aes256 -out private/client_c_intermediate_ca.key 4096
+
+# Create intermediate CA certificate signing request
+openssl req -new -key private/client_c_intermediate_ca.key \
+    -out csr/client_c_intermediate_ca.csr \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client C Organization/OU=Certificate Authority/CN=Client C Intermediate CA"
+
+# Sign the intermediate CSR with the root CA
+openssl x509 -req -in csr/client_c_intermediate_ca.csr \
+    -CA certs/client_c_root_ca.crt \
+    -CAkey private/client_c_root_ca.key \
+    -CAcreateserial \
+    -out certs/client_c_intermediate_ca.crt \
+    -days 1825 -sha256 \
+    -extensions v3_intermediate_ca \
+    -extfile <(echo -e "[v3_intermediate_ca]\nsubjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid:always,issuer\nbasicConstraints = critical, CA:true, pathlen:0\nkeyUsage = critical, digitalSignature, cRLSign, keyCertSign")
+  ```
+
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl verify -CAfile certs/client_c_root_ca.crt certs/client_c_intermediate_ca.crt",
+    "",
+    'openssl x509 -in certs/client_c_intermediate_ca.crt -text -noout | grep -A2 "Issuer\|Subject"'
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-3" label="FileTree" default>
+export const step3 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: []
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            }
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step3}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_c_intermediate_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-3" label="Schema" default>
+    ![Step3](/img/security/protocols/mtls/step3.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 4: Generate Intermediate CA Certificate for Client B (optional)
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+  ```yaml title="Generate Intermediate CA Certificate for Client B"
+cd client_b_ca
+
+# Generate intermediate CA private key
+openssl genrsa -aes256 -out private/client_b_intermediate_ca.key 4096
+
+# Create intermediate CA certificate signing request
+openssl req -new -key private/client_b_intermediate_ca.key \
+    -out csr/client_b_intermediate_ca.csr \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client B Organization/OU=Certificate Authority/CN=Client B Intermediate CA"
+
+# Sign the intermediate CSR with the root CA
+openssl x509 -req -in csr/client_b_intermediate_ca.csr \
+    -CA certs/client_b_root_ca.crt \
+    -CAkey private/client_b_root_ca.key \
+    -CAcreateserial \
+    -out certs/client_b_intermediate_ca.crt \
+    -days 1825 -sha256 \
+    -extensions v3_intermediate_ca \
+    -extfile <(echo -e "[v3_intermediate_ca]\nsubjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid:always,issuer\nbasicConstraints = critical, CA:true, pathlen:0\nkeyUsage = critical, digitalSignature, cRLSign, keyCertSign")
+
+  ```
+
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl verify -CAfile certs/client_b_root_ca.crt certs/client_b_intermediate_ca.crt",
+    "",
+    'openssl x509 -in certs/client_b_intermediate_ca.crt -text -noout | grep -A2 "Issuer\|Subject"'
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-4" label="FileTree" default>
+export const step4 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step4}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_b_intermediate_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-4" label="Schema" default>
+    ![Step4](/img/security/protocols/mtls/step4.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 5: Generate CSR from Client B to Client C
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+  ```yaml title="Generate CSR from Client B to Client C"
+# Create directory for client certificates
+mkdir -p client_b_cert
+
+# Generate Client B's private key for the client certificate
+openssl genrsa -aes256 -out client_b_cert/client_b.key 2048
+
+# Generate CSR from Client B for Client C to sign
+openssl req -new -key client_b_cert/client_b.key \
+    -out client_b_cert/client_b_to_client_c.csr \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client B Organization/OU=Client Services/CN=client-b.local"
+
+# Transfer the CSR to Client C (simulate file transfer)
+cp client_b_cert/client_b_to_client_c.csr ../client_c_ca/csr/
+  ```
+
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl req -in client_b_cert/client_b_to_client_c.csr -text -noout",
+    "",
+    'openssl req -in client_b_cert/client_b_to_client_c.csr -verify -noout'
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-5" label="FileTree" default>
+export const step5 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_b_cert',
+          type: 'directory',
+          children: [
+            { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+            { name: 'client_b.key', type: 'file', content: key },
+          ],
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+                { name: 'client_c_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step5}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_b_intermediate_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-5" label="Schema" default>
+    ![Step5](/img/security/protocols/mtls/step5.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 6: Client C Signs the CSR and Returns the Certificate
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+Client C uses its intermediate certificate to sign Client B's CSR:
+
+  ```yaml title="Client C Signs the CSR and Returns the Certificate"
+cd client_c_ca
+
+# Create client certificate signed by Client C's intermediate CA
+openssl x509 -req -in csr/client_b_to_client_c.csr \
+    -CA certs/client_c_intermediate_ca.crt \
+    -CAkey private/client_c_intermediate_ca.key \
+    -CAcreateserial \
+    -out certs/client_b_signed_by_client_c.crt \
+    -days 365 -sha256 \
+    -extensions v3_client \
+    -extfile <(echo -e "[v3_client]\nsubjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid,issuer\nbasicConstraints = CA:FALSE\nkeyUsage = critical, nonRepudiation, digitalSignature, keyEncipherment\nextendedKeyUsage = clientAuth")
+
+# Transfer the signed certificate back to Client B (simulate file transfer)
+cp certs/client_b_signed_by_client_c.crt ../client_b_cert/
+
+# Create certificate chain file for Client B
+cat certs/client_c_intermediate_ca.crt certs/client_c_root_ca.crt > certs/client_c_ca_chain.crt
+cp certs/client_c_ca_chain.crt ../client_b_cert/
+  ```
+
+Verification Command :
+
+<Terminal  prompt="bash:~$"
+  title="Verification Command"
+  lines={[
+    "openssl x509 -in certs/client_b_signed_by_client_c.crt -text -noout",
+    "",
+    'openssl verify -CAfile certs/client_c_root_ca.crt -untrusted certs/client_c_intermediate_ca.crt certs/client_b_signed_by_client_c.crt'
+  ]}
+/>
+  </TabItem>
+
+  <TabItem value="filetree-6" label="FileTree" default>
+export const step6 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_b_cert',
+          type: 'directory',
+          children: [
+            { name: 'client_b_signed_by_client_c.crt', type: 'file', content: certificate },
+            { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+            { name: 'client_b.key', type: 'file', content: key },
+            { name: 'client_c_ca_chain.crt', type: 'file', content: chain },
+          ],
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_signed_by_client_c.crt', type: 'file', content: certificate },
+                { name: 'client_c_ca_chain.crt', type: 'file', content: chain },
+                { name: 'client_c_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_intermediate_ca.srl', type: 'file', content: srl },
+                { name: 'client_c_root_ca.srl', type: 'file', content: srl },
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+                { name: 'client_c_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step6}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_b_intermediate_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-6" label="Schema" default>
+    ![Step6](/img/security/protocols/mtls/step6.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 7: Create Server Certificate for Client C
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+Client C needs its own server certificate for the mTLS connection :
+
+  ```yaml title="Create Server Certificate for Client C"
+# Generate server private key for Client C
+openssl genrsa -aes256 -out private/client_c_server.key 2048
+
+# Create server CSR for Client C
+openssl req -new -key private/client_c_server.key \
+    -out csr/client_c_server.csr \
+    -subj "/C=FR/ST=Iles-De-France/L=Paris/O=Client C Organization/OU=Server Services/CN=client-c.local"
+
+# Self-sign the server certificate using Client C's intermediate CA
+openssl x509 -req -in csr/client_c_server.csr \
+    -CA certs/client_c_intermediate_ca.crt \
+    -CAkey private/client_c_intermediate_ca.key \
+    -CAcreateserial \
+    -out certs/client_c_server.crt \
+    -days 365 -sha256 \
+    -extensions v3_server \
+    -extfile <(echo -e "[v3_server]\nsubjectKeyIdentifier = hash\nauthorityKeyIdentifier = keyid,issuer\nbasicConstraints = CA:FALSE\nkeyUsage = critical, digitalSignature, keyEncipherment\nextendedKeyUsage = serverAuth\nsubjectAltName = @alt_names\n[alt_names]\nDNS.1 = client-c.local\nDNS.2 = localhost\nIP.1 = 127.0.0.1")
+  ```
+
+  </TabItem>
+
+  <TabItem value="filetree-7" label="FileTree" default>
+export const step7 = (() => {
+const certificate = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const chain = `
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+-----BEGIN CERTIFICATE-----
+...
+-----END CERTIFICATE-----
+`.trim();
+
+const csr = `
+-----BEGIN CERTIFICATE REQUEST-----
+...
+-----END CERTIFICATE REQUEST-----
+`.trim();
+
+const key = `
+-----BEGIN ENCRYPTED PRIVATE KEY-----
+...
+-----END ENCRYPTED PRIVATE KEY-----
+
+`.trim();
+const srl = `
+7A3C8F1B5EXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX
+
+`.trim();
+return [
+    {
+      name: 'mTLS',
+      type: 'directory',
+      children: [
+        {
+          name: 'client_b_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_b_root_ca.srl', type: 'file', content: srl },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_b_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_b_root_ca.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+        {
+          name: 'client_b_cert',
+          type: 'directory',
+          children: [
+            { name: 'client_b_signed_by_client_c.crt', type: 'file', content: certificate },
+            { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+            { name: 'client_b.key', type: 'file', content: key },
+            { name: 'client_c_ca_chain.crt', type: 'file', content: chain },
+          ],
+        },
+        {
+          name: 'client_c_ca',
+          type: 'directory',
+          children: [
+            {
+              name: 'certs',
+              type: 'directory',
+              children: [
+                { name: 'client_b_signed_by_client_c.crt', type: 'file', content: certificate },
+                { name: 'client_c_ca_chain.crt', type: 'file', content: chain },
+                { name: 'client_c_intermediate_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_intermediate_ca.srl', type: 'file', content: srl },
+                { name: 'client_c_root_ca.crt', type: 'file', content: certificate },
+                { name: 'client_c_root_ca.srl', type: 'file', content: srl },
+                { name: 'client_c_server.crt', type: 'file', content: certificate },
+              ]
+            },
+            {
+              name: 'csr',
+              type: 'directory',
+              children: [
+                { name: 'client_b_to_client_c.csr', type: 'file', content: csr },
+                { name: 'client_c_intermediate_ca.csr', type: 'file', content: csr },
+                { name: 'client_c_server.csr', type: 'file', content: csr },
+              ]
+            },
+            {
+              name: 'private',
+              type: 'directory',
+              children: [
+                { name: 'client_c_intermediate_ca.key', type: 'file', content: key },
+                { name: 'client_c_root_ca.key', type: 'file', content: key },
+                { name: 'client_c_server.key', type: 'file', content: key },
+              ]
+            },
+          ]
+        },
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={step7}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="client_b_intermediate_ca.crt"
+/>
+  </TabItem>
+  <TabItem value="schema-7" label="Schema" default>
+    ![Step7](/img/security/protocols/mtls/step7.png)
+  </TabItem>
+</Tabs>
+
+#### STEP 8: Connections tests
+
+<Tabs>
+  <TabItem value="commands-1" label="Commands" default>
+Client C needs its own server certificate for the mTLS connection :
+
+  ```yaml title="Start server"
+cd client_c_ca
+
+# Start OpenSSL s_server with mutual TLS verification
+openssl s_server -accept 8443 \
+    -cert certs/client_c_server.crt \
+    -key private/client_c_server.key \
+    -CAfile certs/client_c_ca_chain.crt \
+    -Verify 2 \
+    -state
+  ```
+  Test from Client B:
+
+```yaml title="Open mTLS connection"
+cd client_b_cert
+
+# Test connection from Client B to Client C using mTLS
+openssl s_client -connect localhost:8443 \
+  -cert client_b_signed_by_client_c.crt \
+  -key client_b.key \
+  -CAfile client_c_ca_chain.crt \
+  -Verify 2 \
+  -state
+```
+
+  </TabItem>
+
+  <TabItem value="schema-8" label="Schema" default>
+    ![Step8](/img/security/protocols/mtls/step8.png)
+  </TabItem>
+</Tabs>
+
+### Verifications commands
+
+Certificate and Key Matching Verification :
+
+```yaml title="Certificate and Key Matching Verification"
+# Verify private key matches certificate (should show same hash)
+openssl rsa -noout -modulus -in client_b_cert/client_b.key | openssl sha256
+openssl x509 -noout -modulus -in client_b_cert/client_b_signed_by_client_c.crt | openssl sha256
+
+# Verify CSR matches private key
+openssl req -noout -modulus -in client_b_cert/client_b_to_client_c.csr | openssl sha256
+```
+
+Certificate Chain Verification:
+
+```yaml title="Certificate Chain Verification"
+# Verify complete certificate chain
+openssl verify -show_chain -CAfile client_c_ca/certs/client_c_root_ca.crt \
+    -untrusted client_c_ca/certs/client_c_intermediate_ca.crt \
+    client_b_cert/client_b_signed_by_client_c.crt
+
+# Check certificate validity periods
+openssl x509 -in client_b_cert/client_b_signed_by_client_c.crt -noout -dates
+
+```
+
+Connection Testing Commands:
+
+```yaml title="Connection Testing Commands"
+# Test TLS connection without client certificate (should fail with mTLS server)
+openssl s_client -connect localhost:8443 -CAfile client_b_cert/client_c_ca_chain.crt
+
+# Test with wrong client certificate (should fail)
+openssl s_client -connect localhost:8443 \
+    -cert client_b_ca/certs/client_b_root_ca.crt \
+    -key client_b_ca/private/client_b_root_ca.key \
+    -CAfile client_b_cert/client_c_ca_chain.crt
+
+```
+
+### mTLS Handshake Process
+
+```mermaid
+sequenceDiagram
+    participant Client_B as Client B
+    participant Client_C as Client C
+
+    Note over Client_B,Client_C: mTLS Handshake Process with Certificates and Keys
+
+    Client_B->>Client_C: Client Hello (supported cipher suites, TLS version)
+    Client_C->>Client_B: Server Hello (chosen cipher suite)
+    Client_C->>Client_B: Send Server Certificate
+    Note over Client_C,Client_B: Certificate : client_c_server.crt + Chain
+
+    Client_C->>Client_B: Request Client Certificate
+    Client_B->>Client_C: Send Client Certificate
+    Note over Client_B,Client_C: Certificate: client_b_signed_by_client_c.crt + Chain
+
+    Client_B->>Client_C: Client Key Exchange
+    Note over Client_B,Client_C: Proves possession of private key (client_b.key)
+
+    Client_B->>Client_C: Certificate Verify
+    Note over Client_C: Validate client cert signed by Client C's CA
+
+    Client_C->>Client_B: Server Finished
+    Client_B->>Client_C: Client Finished
+
+    Note over Client_B,Client_C: Secure encrypted channel established after verification
+
+```
+
+### Concept
+Client B and Client C trust each other in a mutual TLS (mTLS) connection because both parties authenticate each other using digital certificates issued by trusted Certificate Authorities (CAs). Here's why and how this trust is established:
+
+  1. Certificate Exchange and Verification
+    During the mTLS handshake, Client C (the server) presents its server certificate to Client B (the client). Client B verifies this certificate against a list of trusted CAs it has. This confirms that Client C is who it claims to be and that its certificate is valid and trusted.
+
+  2. Client Certificate and Proof of Possession
+    Similarly, Client B presents its client certificate to Client C. Client C verifies this certificate against its trusted CA list to confirm Client B’s identity. Client B also proves possession of the private key corresponding to the certificate, ensuring the certificate is not being impersonated.
+
+  3. Trusted Certificate Authorities (CAs)
+    Both Client B and Client C **trust the same or cross-recognized Certificate Authorities that issue the certificates**. Because the certificates are signed by these trusted CAs, each party can rely on the authenticity of the other's certificate.
+
+  4. Mutual Authentication Process
+    The mutual certificate verification combined with proof of private key possession creates a strong trust relationship—each party has cryptographic proof of the other's identity before secure communication happens.
+
+  5. Secure Encrypted Channel Established
+    Once both sides verify certificates successfully, an encrypted and authenticated TLS connection is established, ensuring confidentiality, integrity, and authenticity of the communication.
+
+
+
+
+
+
+
+

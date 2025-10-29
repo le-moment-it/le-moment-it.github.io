@@ -1,0 +1,218 @@
+---
+sidebar_position: 3
+title: Hub & Spoc infrastructure
+description: Introduction to Hub & Spoc infrastructure
+---
+
+## Introduction
+
+As organizations scale, infrastructure requirements increase correspondingly. Managing isolated environments so development teams can efficiently deploy and test their applications becomes more complex. It is also important to provide shared services and monitoring capabilities across these environments.
+
+This is where the **Hub & Spoc architecture** comes into play.
+
+:::note
+Hub & Spoc architecture is an advanced design discussed in this article. If your infrastructure needs are more basic, refer to the [three-layers architecture](./three-layer.mdx)
+:::
+
+## Hub & Spoc Overview
+
+As the name suggests, this architecture features two primary components.
+
+### Hub definition
+The `hub` acts as a central, standalone infrastructure accessible to all spocs. It hosts shared IT services useful to each spoc, or services that are environment-agnostic. Common examples include:
+
+  - VCS (Gitlab, Gitea etc ...)
+  - Container registry / [Image registry](./golden-image.mdx)
+  - Central authentication system (Active Directory, OpenLDAP, SSO)
+  - Monitoring APM and Logging system (service and storage)
+
+:::warning
+ervices that should **not** be deployed in the hub include:
+
+  - Environment linked applications
+  - Applications databases
+  - Applications secrets
+  - ...
+::: 
+
+### Spoc definition
+
+A spoc provides an isolated environment for deploying environment-specific IT services. Any service that is relevant solely within a spoc belongs here.
+
+:::note Return of experience : Hosting
+We often define the `spoc` as an environment. But during my past experiences, I've designed an infrastructure to be able to host client applications and infrastructure. I've decided to create an Hub and Spoc architecture where each spoc were one of my client infrastructure. If the client needed 3 infrastructure (`prod`, `qa`, `dev`), I was creating 3 spocs.
+
+By combining this with a fully automated client onboarding process—implemented  (based on [Terraspace](https://terraspace.cloud/)), I successfully created new **standardized** and **provisionned spocs** in less than **10 mins**.
+:::
+
+The Hub & Spoc infrastructure can be visualized as follows, with example services deployed:
+
+![Overview](/img/architecture/system-network/hub-and-spoc/introduction.drawio.svg)
+
+## Why choose this architecture ?
+
+### Advantages
+
+
+#### Infrastructure scaling
+
+Scaling is a key benefit of this model. The hub and each spoc operate independently, allowing for the seamless addition of spocs without impacting existing ones or the hub itself—provided that IP planning is effective.
+
+#### Central management
+
+The architecture allows the entire infrastructure to be managed centrally from the hub. All spoc updates, monitoring, and improvements can be performed in one location, regardless of the number of spocs.
+
+
+#### Isolation & security
+
+Hub & Spoc architecture offers robust isolation by segregating each spoc, minimizing single points of failure across the system. With well-defined IAM and network policies, only authorized users can access designated services within specific spocs.
+
+#### Cost management
+
+Another none-technical aspect of the hub and spoc management is its capability to isolate costs. Indeed, using central costs management such as [AWS organizations](https://docs.aws.amazon.com/organizations/latest/userguide/orgs_introduction.html), you will know exactly how much each spoc will cost.
+
+This can be very useful if you need to re-invoice the cost of the infrastructure to an internal or external customer.
+
+### Limitations
+
+#### Hub risks
+
+The hub serves as the central heartbeat of the infrastructure, making it a critical single point of failure. According to your risk policy, hub services should be scaled and made redundant to prevent outages that could affect spocs.
+
+#### Cost
+
+Hub & Spoc architecture can be costlier than simpler models, such as [**Three Tier architecture**](./three-layer.mdx). Costs mainly stem from networking and the time required to maintain and improve the system.
+
+#### Automation Complexity
+
+A high level of automation maturity is essential. As the number of spocs grows, so does the complexity of managing updates and preventing configuration drift.
+
+Adopting infrastructure-as-code tools like [Terraform](https://developer.hashicorp.com/terraform/docs)/[OpenTofu](https://opentofu.org/) or [Ansible](https://docs.ansible.com/) is recommended.
+
+:::note One more thing
+Provisioning new spocs should be fully automated as part of an overall automation maturity strategy. 
+:::
+
+## Network architecture
+
+Implementing Hub & Spoc infrastructure introduces several networking challenges. Here's an overview of the key considerations.
+
+### Internal networking
+
+In the previous schema, I didn't showcase any network/subnet configuration in each of the separated spoc or hub. This was on purpose and we will detail it now.
+
+Both hub and spoc networking should be highly thought in order to scale properly. However, a good way to design each of these parts is to use , for each of them, the **Three-Tier** architecture design.
+
+You can find a dedicated article about this architecture here : [**Three Tier architecture**](./three-layer.mdx).
+
+A standardized Hub & Spoc infrastructure may appear as follows:
+
+![Overview](/img/architecture/system-network/hub-and-spoc/subnets.drawio.svg)
+
+
+### Hub and Spoc communication
+
+As you understood, IT services needed are hosted inside the hub network. Therefore , you need to allow communication from your Spoc to your Hub. If you are using a cloud provider, you may have some services that can enable this connection for you, for example, with AWS, you may enable VPC peering to allow communication between your spoc network to your hub network. If you a deploying this architecture on premise, you will need to configure this network by yourself.
+
+:::warning
+Before deploying your Hub and Spoc architecture, you need to think about network IPs/Subnet to ensure that none of your spoc network has the same IPs/mask.
+:::
+
+## IT services interactions
+
+### Hub \<- Spoc
+
+Now that your networks/subnets and inter-networks communication is setup, you need to think about how your IT services will interact with each other.
+
+:::danger MUST KNOWN RULE
+**NEVER** permit communication between spocs. This leads to unmanageable permissions and poor practices.
+:::
+
+Typically, spocs should only access necessary hub services. Data flow from spocs to the hub should be restricted, except for well-defined use cases (see [Hub & Spoc interactions example](#hub--spoc-interactions-example)).
+
+### Pull vs Push
+
+:::note Return of experience : Provisioning
+The following recommendation is based on professional experience; applicability may vary
+:::
+
+When you design automation or provisioning, you may encounter the following question : 
+
+- Should I **push** the configuration **to the system** I am trying to provision
+- Should I **pull** the configuration **from the system** I am trying to provision
+
+If you plan to setup a provisioning system within your hub, I highly recommend you to think your system like : **The system you are trying to configure pull its configuration**.
+
+A pulling system has the following benefits :
+
+- It remains consistent with how the spoc interacts with the hub
+- It oftens decorallate the ordering (and avoid race conditions) when a provisiong system has multiple steps.
+- It could be considered more secured because when you pull a configuration , this one must be ready to use and your system is ready to receive it. On the opposite, pushing a configuration does check if your system is ready to receive it.
+
+### Schema example
+
+If we would like to picture a complete example of IT infrastructure using Hub and Spoc architecture, it would looks like :
+
+![Complete](/img/architecture/system-network/hub-and-spoc/complete.svg)
+
+This infrastructure shows :
+
+- **Gitlab/Gitlab Runner** : Our infrastructure has only one VCS (Version Control System) which is the Gitlab deployed inside the Hub. However, gitlab runners needs to be deployed to each spoc to deploy applications inside the poc (shown with the `application` logo).
+
+- **Harbor** : Since our environments application are based on containers, we need to store the images. These images must be available for all spoc. That's why we host the harbor inside the hub.
+
+- **Monitoring** : The monitoring stack (here shown with Prometheus & Grafana) and storage are hosted in the Hub. This allow you to:
+  - Keep having datas available even if one of your spoc has an issue
+  - Centralise the storage management, data rotations etc ...
+
+- **Active Directory/Authentication** : In this infrastructure, we rely on an Active Directory for authentication. This authentication system must be the same for all spoc so we can easily centralise authorization policy. That's why we deploy this active directory inside the hub.
+
+
+## Hub & Spoc uses cases
+
+In this part, I will details some Hub & Spoc patterns I encountered in my previous experiences that shown how useful the hub & spoc infrastructure.
+
+### Backups & environment alignments
+
+Backups are vital for data recovery and environmental alignment—for instance, restoring anonymized production data to a QA environment. Direct connections between production and QA **should never be permitted**.
+
+Instead, follow this process:
+
+![Backup](/img/architecture/system-network/hub-and-spoc/backup.svg)
+
+Let's describe steps by steps : 
+
+1. Backup your database into a file (it can be a part of your normal backup process)
+2. Transfer this backup into a shared bucket hosted on the `hub`, only an user/role with the specific role can read this backup
+3. From the spoc which needs the backup, pull the backup from the S3 and store it into a S3 within your spoc.
+4. Finally restore this backup inside your spoc database and clean.
+
+This full process can be easily automated and secured.
+
+### Shared DNS names
+
+When you deploy multiple environments , you may want to re-use a single domain name that you would reuse in each of your environment. It avoids you to buy multiple domain names for each of your environments.
+
+:::warning
+Even if you don't pay new domain names, you will still pay the zone management.
+:::
+
+Since your spoc are separated, you need to have a specific DNS zone for each of them.
+
+A cost efficient and easily to implement solution is to host the `root` DNS zone in the hub and each subdomain DNS zone in their respective spoc.
+
+Let's take an example with the `root` DNS zone named `example.com`. Each DNS zone within their spoc, would be named following this convention naming : `<spoc_name>.example.com`
+
+**This is how to implement this** : For each spoc :
+
+- Create a new DNS zone with the subdomain named : `<spoc_name>.example.com`.
+  By creating this new DNS zone, your DNS provider will list you DNS servers that serve your subdomain name. Copy this list of DNS servers
+- In the hub, create a new `NS` record name`<spoc_name>.example.com` where the value is the list of DNS servers provided in the earlier step.
+
+That's it ! You have now a dedicated public zone for each of your spoc.
+
+If you plan to implement a shared DNS zones, I advice you to automate its implementation at the provisioning of the spoc.
+
+## Conclusion
+
+Hub & Spoc infrastructure is an optimal model for organizations requiring scalable, secure, and isolated environments. It offers strong design advantages, but also presents technical and cost-related challenges. Careful consideration of hub-related risks and strategic scaling are crucial to successful deployment.

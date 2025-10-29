@@ -1,0 +1,8 @@
+{
+    "label": "System & Networks",
+    "position": 1,
+    "link": {
+        "type": "generated-index",
+        "description": "Find in this section, architecture good practices and design patern"
+    }
+}

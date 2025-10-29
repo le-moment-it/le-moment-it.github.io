@@ -1,0 +1,336 @@
+---
+sidebar_position: 1
+title: Ansible roles
+description: How to create a good Ansible role?
+---
+
+import FileTree from "@site/src/components/Filetree";
+import Tabs from "@theme/Tabs";
+import TabItem from "@theme/TabItem";
+
+## Introduction
+
+If you decide to use Ansible as your main infrastructure-as-code tool to configure your infrastructure (virtual machines, network devices, etc.), you may ask yourself the following question:
+
+> How can I create **reusable** code that I can share across my entire organization and that will simplify future updates and management?
+
+In this article, I will explain what an **Ansible role** is and share good practices for their management, testing, and utilization.
+
+## Ansible role definition
+
+An Ansible role is a reusable set of **Ansible playbooks** and **variables** that you can import and apply with the following piece of code:
+
+```yaml
+---
+# Importing common and webservers roles
+- hosts: webservers
+  roles:
+    - common
+    - webservers
+```
+
+Using roles eases configuration management because they allow you to centralize updates to the role code so changes can be propagated to any devices that import this role. This avoids code duplication.
+
+Using Ansible roles is, de facto, an excellent practice when deciding to use Ansible to manage an entire infrastructure.
+
+## Role structure
+
+According to its [documentation](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_reuse_roles.html#role-directory-structure) :
+
+> An Ansible role has a defined directory structure with seven main standard directories. You must include at least one of these directories in each role. You can omit any directories the role does not use :
+
+```
+roles/
+    common/               # this hierarchy represents a "role"
+        tasks/            #
+            main.yml      #  <-- tasks file can include smaller files if warranted
+        handlers/         #
+            main.yml      #  <-- handlers file
+        templates/        #  <-- files for use with the template resource
+            ntp.conf.j2   #  <------- templates end in .j2
+        files/            #
+            bar.txt       #  <-- files for use with the copy resource
+            foo.sh        #  <-- script files for use with the script resource
+        vars/             #
+            main.yml      #  <-- variables associated with this role
+        defaults/         #
+            main.yml      #  <-- default lower priority variables for this role
+        meta/             #
+            main.yml      #  <-- role dependencies
+        library/          # roles can also include custom modules
+        module_utils/     # roles can also include custom module_utils
+        lookup_plugins/   # or other types of plugins, like lookup in this case
+```
+
+By default, Ansible will look in most role directories for a main.yml file for relevant content (also main.yaml and main):
+
+- `tasks/main.yml` - A list of tasks that the role provides to the play for execution.
+- `handlers/main.yml` - handlers that are imported into the parent play for use by the role or other roles and tasks in the play.
+- `defaults/main.yml` - very low precedence values for variables provided by the role. A role’s own defaults will take priority over other role’s defaults, but any/all other variable sources will override this.
+- `vars/main.yml` - high precedence variables provided by the role to the play (see Using variables for more information).
+- `files/stuff.txt` - one or more files that are available for the role and it’s children.
+- `templates/something.j2` - templates to use in the role or child roles.
+- `meta/main.yml` - metadata for the role, including role dependencies and optional Galaxy metadata such as platforms supported. This is required for uploading into galaxy as a standalone role, but not for using the role in your play.
+
+In addition to the official Ansible documentation, I would like to add three good practices for Ansible role folder and file structure.
+
+### Main entrypoint
+
+In the `tasks` folder, you'll want to split your playbooks into multiple files. Based on my experience, I've found it useful to have the file `main.yml` that imports tasks from other files.
+Moreover, it is convenient to prefix the other files with numbers indicating their execution order.
+Following this good practice, a typical `tasks` folder would look like this:
+
+export const tasks = (() => {
+const main = `
+---
+- name: Installation
+  ansible.builtin.import_tasks: 01-install.yml
+`.trim();
+
+const install = `
+
+- name: Create keyring folder
+  ansible.builtin.file:
+  path: /etc/apt/keyrings
+  state: directory
+  owner: root
+  group: root
+  mode: 0755
+
+- name: Download docker gpg key
+  ansible.builtin.get_url:
+  url: https://download.docker.com/linux/debian/gpg
+  dest: /etc/apt/keyrings/docker.asc
+  owner: root
+  group: root
+  mode: 0755
+
+- name: Install docker sources
+  ansible.builtin.apt_repository:
+  repo: |\
+
+  deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]\
+
+  https://download.docker.com/linux/debian bookworm stable
+
+  state: present
+
+`.trim();
+
+return [
+{
+name: 'tasks',
+type: 'directory',
+children: [
+{ name: 'main.yml', type: 'file', content: main , language: 'yaml'},
+{ name: '01-install.yml', type: 'file', content: install , language: 'yaml'},
+],
+}
+];
+})();
+
+<FileTree
+  data={tasks}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="main.yml"
+/>
+
+### Molecule integration
+
+Ansible roles are a great tool for centralizing configuration. However, by default, there is no integrated system to actually test whether the role works as expected.
+That's why [Ansible Molecule](https://ansible.readthedocs.io/projects/molecule/) was created.
+
+Ansible Molecule allows you to create scenarios where you can deploy temporary infrastructure, deploy your Ansible role on it, and test that it works as expected.
+
+:::note Disclaimer
+This documentation won't go too deep into Molecule explanation and good practices because it is a broad topic. A dedicated documentation will be created for it.
+:::
+
+To integrate Ansible Molecule into your Ansible role, you simply need to create a `molecule` folder inside your file tree.
+
+This `molecule` folder must contain:
+
+```yaml
+.
+└── <scenario_name>
+├── converge.yml
+├── create.yml
+├── destroy.yml
+├── molecule.yml
+├── README.md
+└── verify.yml
+```
+
+Each of these files (except the `molecule.yml` file) defines one of the Ansible Molecule scenario steps.
+
+The `molecule.yml` file defines the scenario steps and parameters.
+
+### Role metadata
+
+The `meta` folder allows you to define the metadata for your role. Among all the metadata you can add to your Ansible role, we can focus on:
+
+Adding a description/documentation for the role:
+
+```yaml title="meta/main.yml"
+description: |
+  This Ansible role installs ...
+```
+
+Supported platforms for your role:
+
+```yaml title="meta/main.yml"
+platforms:
+  - name: Debian
+    versions:
+      - bullseye
+      - bookworm
+      - trixie
+```
+
+Role dependencies:
+
+```yaml title="meta/main.yml"
+dependencies: []
+```
+
+:::success
+Like in many other infrastructure use cases, adding metadata is costless and brings significant value to your organization. It helps you automate processes, inventory your infrastructure, and maintain self-explanatory documentation within your codebase.
+
+If you plan to develop many Ansible roles to manage your organization, it is a good practice to define a set of tags/metadata to apply to all Ansible roles.
+:::
+
+## Best practices
+
+As with any code development, following best practices for Ansible roles is key to having maintainable and reliable configurations.
+
+In this section, we will cover some of the best practices I've found during my experience.
+
+### Idempotency
+
+The first question you may ask yourself is :
+
+> What is **idempotency** ?
+
+When you define an Ansible role and apply it to the machine you want to configure, you want your machine to reach a **desired state**. This state defines the configuration you applied to the machine.
+**Whether you run your role once or multiple times, the outcome should be the same.** This is idempotency.
+
+#### Changes in Ansible
+
+Detecting changes is straightforward in Ansible. Each task performed on your host outputs a result indicating whether something happened on your host or whether the requirements you defined were already met. Among these outputs you will find, **per task**:
+
+- `ok`: No change had been performed
+- `changed`: A change had been performed
+- `unreachable`: The host is unreachable; no configuration has been applied
+- `failed`: The configuration failed to be applied (a change may have been performed)
+- `skipped`: The task had been skipped
+- `ignored`: The task had been ignored
+
+Here's what an output looks like:
+
+![Output](/img/devops/tools/semaphore-ui/output.png)
+
+#### Idempotency benefits
+
+Idempotency is crucial to keep in mind when designing, developing, or updating an Ansible role. When you re-deploy this role to your sets of servers, you want to know **exactly** which changes have been performed on them. You don't want **any false positives** to ensure that you can understand **which changes were performed**, **from which role**, **on which task**, **and why**.
+
+Having non-idempotent roles will lead to **incorrect change management** on your infrastructure and possible failures.
+
+#### Challenges
+
+As described in this [documentation](https://docs.ansible.com/ansible/latest/playbook_guide/playbooks_intro.html#desired-state-and-idempotency), most Ansible plugins are idempotent.
+
+However, after many years of use, I have encountered multiple use cases where idempotency needs to be set up carefully. I will share some of these use cases and how to resolve the issues.
+
+<Tabs>
+  <TabItem value="windows" label="Windows plugins" default>
+When I started using Ansible in 2017, almost only Linux plugins were available. In the following years, the need for Windows server management with Ansible grew. More and more new Ansible plugins for Windows servers were created. However, due to their younger maturity, they may have failed to check the idempotency of the configuration you want to provide.
+If you decide to use Windows plugins, test their idempotency properties and take necessary actions if they don't respect it.
+  </TabItem>
+  <TabItem value="file" label="Conditions" default>
+When you define your Ansible configuration, you want to reach a desired state. However, to reach this state, you may need to manually specify a condition on the plugins you need.
+Let's take a concrete example:
+> I want to create a file only if it is not already created
+
+:::warning
+The `ansible.builtin.file` plugin is not idempotent; applying this plugin multiple times will recreate the file.
+:::
+
+Here is the condition we need to create:
+
+```yaml
+- name: Check if the configuration file already exists
+  ansible.builtin.stat:
+    path: "example/config"
+  register: config
+
+- name: Create the file if not already exists
+  ansible.builtin.file:
+    path: "example/config"
+    state: touch
+    mode: 0640
+  when: not config.stat.exists
+```
+
+  </TabItem>
+  <TabItem value="" label="Multiple file parts" default>
+When you use multiple roles, it can happen that these multiple roles modify the same single file. In that case, your idempotency may never be validated.
+To avoid this behavior, you can use Ansible plugins such as `ansible.builtin.blockinfile` (or `ansible.builtin.lineinfile`). These plugins verify that the full block or line you define is inside the file without modifying the rest (moreover, you can add `marker_begin` and `marker_end` to ensure a proper understanding of the configuration definition).
+  </TabItem>
+</Tabs>
+
+### Scope
+
+When you create an Ansible role, the first question you may ask yourself is:
+
+> **What desired state do I want to reach with my role?**
+
+Or, said differently:
+
+> **What configuration do I want to provide with my Ansible role?**
+
+The answer to this question may be harder to find than you think. Let's take an example to understand why:
+
+> You need to create a reusable configuration to deploy a WordPress server. You know that to deploy WordPress you need **at least** a web server, PHP, a database, etc.
+
+Will you create a single Ansible role named `wordpress` that will install and configure all services defined above, or will you create an Ansible role for each service?
+
+**There is no single answer to this question**. It depends on **your organization**, your **Ansible role development maturity**, and your **Ansible role strategy**.
+
+:::note My experience
+In my experience, I found it useful to define **a single Ansible role per service** I want to configure. This ensured strong reusability. However, to ensure strong reusability, before starting to develop the role, I define what the `inputs` (`variables`) and outputs (`configurations` created) will be for my role.
+
+For example, for the role `nginx`, I will define as an `input` a variable `vhosts` that will define all hosts (and their properties) that my `nginx` role will configure. With such input, I will be able to reuse this Ansible role for many purposes (WordPress website, Drupal website, reverse proxy, etc.)
+:::
+
+### Readability
+
+Ansible uses **YAML** as a declarative language. It is extremely readable. When you develop an Ansible role, you want to keep this readability as much as possible. Here are a few good practices that will ensure this strong readability.
+
+#### Task names
+
+Ansible tasks **must be named**. Choose a self-explanatory name for each of them. This will allow you to have self-explanatory configuration code.
+
+#### Variable names
+
+When you develop an Ansible role, it is a good practice to **prefix your variable names with the name of the role**. For example, for a role named `apache2`, you can prefix your variables such as `apache2_variable_to_name`. Prefixing a variable with the role name will avoid conflicts between variables when multiple roles are applied to a single host.
+
+#### KISS principle
+
+When you develop an Ansible role, keep in mind that your configuration must be KISS (Keep It Simple, Stupid). Don't overuse abstract objects such as loops, maps, etc., because they often lead to unnecessary complexity. Sometimes, it may be more relevant to develop two Ansible roles instead of developing one that has all features but is very difficult to use or maintain.
+
+## Conclusion
+
+In this article, we've explored the fundamentals of Ansible roles and best practices for creating maintainable, reusable infrastructure code. Let's recap the key takeaways:
+
+**Ansible roles** are the cornerstone of reusable infrastructure automation. They allow you to:
+
+- **Centralize configuration** updates and propagate them across your entire infrastructure
+- **Avoid code duplication** and ensure consistency across your organization
+- **Enable collaboration** through shared, version-controlled roles
+
+The proper **role structure** with directories like `tasks/`, `handlers/`, `templates/`, `vars/`, and `meta/` provides organization and clarity. Integrating **Molecule** for testing ensures your roles work as expected before deployment to production.
+
+Following **best practices** such as maintaining **idempotency**, defining clear **scope** for each role, and prioritizing **readability** through proper naming and KISS principles will make your Ansible roles maintainable and reliable.
+
+Remember: well-designed Ansible roles are an investment in your infrastructure's future. They simplify management, reduce errors, and enable your team to scale infrastructure automation effectively. Start small, iterate, and continuously improve your role development process based on your organization's specific needs.

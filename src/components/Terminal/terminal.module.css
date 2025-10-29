@@ -1,0 +1,255 @@
+/* Terminal.module.css */
+
+.terminal {
+    --terminal-bg-light: #f6f8fa;
+    --terminal-bg-dark: #0d1117;
+    --terminal-border-light: #d0d7de;
+    --terminal-border-dark: #21262d;
+    --terminal-text-light: #24292f;
+    --terminal-text-dark: #e6edf3;
+    --terminal-prompt-light: #0969da;
+    --terminal-prompt-dark: #58a6ff;
+    --terminal-command-light: #24292f;
+    --terminal-command-dark: #adbac7;
+    --terminal-header-bg-light: #f6f8fa;
+    --terminal-header-bg-dark: #161b22;
+    --terminal-button-red: #ff5f56;
+    --terminal-button-yellow: #ffbd2e;
+    --terminal-button-green: #27ca3f;
+    --terminal-copy-bg-light: rgba(255, 255, 255, 0.8);
+    --terminal-copy-bg-dark: rgba(0, 0, 0, 0.4);
+    --terminal-copy-border-light: #d0d7de;
+    --terminal-copy-border-dark: #30363d;
+
+    border: 1px solid var(--terminal-border-light);
+    border-radius: 8px;
+    margin: 1rem 0;
+    overflow: hidden;
+    font-family: 'SFMono-Regular', Consolas, 'Liberation Mono', Menlo, Courier, monospace;
+    font-size: 14px;
+    background-color: var(--terminal-bg-light);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+    position: relative;
+}
+
+/* Dark mode styles */
+[data-theme='dark'] .terminal {
+    background-color: var(--terminal-bg-dark);
+    border-color: var(--terminal-border-dark);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.terminalHeader {
+    display: flex;
+    align-items: center;
+    padding: 8px 12px;
+    background-color: var(--terminal-header-bg-light);
+    border-bottom: 1px solid var(--terminal-border-light);
+    position: relative;
+}
+
+[data-theme='dark'] .terminalHeader {
+    background-color: var(--terminal-header-bg-dark);
+    border-bottom-color: var(--terminal-border-dark);
+}
+
+.terminalButtons {
+    display: flex;
+    gap: 6px;
+}
+
+.terminalButton {
+    width: 12px;
+    height: 12px;
+    border-radius: 50%;
+    display: inline-block;
+}
+
+.terminalButton[data-color="red"] {
+    background-color: var(--terminal-button-red);
+}
+
+.terminalButton[data-color="yellow"] {
+    background-color: var(--terminal-button-yellow);
+}
+
+.terminalButton[data-color="green"] {
+    background-color: var(--terminal-button-green);
+}
+
+.terminalTitle {
+    position: absolute;
+    left: 50%;
+    transform: translateX(-50%);
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--terminal-text-light);
+}
+
+[data-theme='dark'] .terminalTitle {
+    color: var(--terminal-text-dark);
+}
+
+.terminalContent {
+    padding: 12px 16px;
+    background-color: var(--terminal-bg-light);
+    position: relative;
+}
+
+[data-theme='dark'] .terminalContent {
+    background-color: var(--terminal-bg-dark);
+}
+
+.terminalLine {
+    display: flex;
+    align-items: flex-start;
+    line-height: 1.4;
+    margin-bottom: 2px;
+}
+
+.terminalLine:last-child {
+    margin-bottom: 0;
+}
+
+.terminalPrompt {
+    color: var(--terminal-prompt-light);
+    font-weight: 600;
+    margin-right: 8px;
+    user-select: none;
+    flex-shrink: 0;
+}
+
+[data-theme='dark'] .terminalPrompt {
+    color: var(--terminal-prompt-dark);
+}
+
+.terminalCommand {
+    color: var(--terminal-command-light);
+    font-weight: 400;
+    flex: 1;
+    word-break: break-all;
+    white-space: pre-wrap;
+}
+
+[data-theme='dark'] .terminalCommand {
+    color: var(--terminal-command-dark);
+}
+
+/* Copy button styling - matches Terragrunt exactly */
+.copyButton {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    background: var(--terminal-copy-bg-light);
+    border: 1px solid var(--terminal-copy-border-light);
+    border-radius: 6px;
+    padding: 6px 8px;
+    cursor: pointer;
+    font-size: 12px;
+    font-weight: 500;
+    color: var(--terminal-text-light);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    min-width: 60px;
+    height: 28px;
+    transition: all 0.2s ease;
+    backdrop-filter: blur(8px);
+    font-family: inherit;
+}
+
+[data-theme='dark'] .copyButton {
+    background: var(--terminal-copy-bg-dark);
+    border-color: var(--terminal-copy-border-dark);
+    color: var(--terminal-text-dark);
+}
+
+.copyButton:hover {
+    background: rgba(255, 255, 255, 0.9);
+    border-color: #b0b7c3;
+    transform: translateY(-1px);
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+[data-theme='dark'] .copyButton:hover {
+    background: rgba(0, 0, 0, 0.6);
+    border-color: #484f58;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.copyButton:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+.copyButton svg {
+    width: 14px;
+    height: 14px;
+    opacity: 0.8;
+}
+
+/* Hover effect for the entire terminal */
+.terminal:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15);
+}
+
+[data-theme='dark'] .terminal:hover {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.4);
+}
+
+/* Selection styling */
+.terminalCommand::selection {
+    background-color: rgba(9, 105, 218, 0.3);
+}
+
+[data-theme='dark'] .terminalCommand::selection {
+    background-color: rgba(88, 166, 255, 0.3);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .terminal {
+        font-size: 12px;
+    }
+
+    .terminalContent {
+        padding: 10px 12px;
+    }
+
+    .terminalHeader {
+        padding: 6px 10px;
+    }
+
+    .terminalTitle {
+        display: none;
+    }
+
+    .copyButton {
+        top: 6px;
+        right: 6px;
+        padding: 4px 6px;
+        min-width: 50px;
+        height: 24px;
+        font-size: 11px;
+    }
+
+    .copyButton svg {
+        width: 12px;
+        height: 12px;
+    }
+}
+
+/* Animation for copy success state */
+@keyframes copySuccess {
+    0% {
+        transform: scale(0.95);
+    }
+
+    50% {
+        transform: scale(1.05);
+    }
+
+    100% {
+        transform: scale(1);
+    }
+}

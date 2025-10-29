@@ -1,0 +1,219 @@
+.fileTree {
+    border-radius: var(--ifm-border-radius);
+    background: var(--ifm-background-color);
+    font-family: var(--ifm-font-family-base);
+    font-size: 14px;
+    max-height: 500px;
+    overflow-y: auto;
+    margin: 1rem 0;
+}
+
+.fileTreeContainer {
+    display: flex;
+    border-radius: var(--ifm-border-radius);
+    background: var(--ifm-background-color);
+    font-family: var(--ifm-font-family-base);
+    font-size: 14px;
+    height: 600px;
+    margin: 1rem 0;
+}
+
+.fileTreePanel {
+    flex: 1;
+    min-width: 250px;
+    max-width: 400px;
+    overflow-y: auto;
+    height: 100%;
+}
+
+.node {
+    position: relative;
+}
+
+.nodeContent {
+    display: flex;
+    align-items: center;
+    padding: 6px 8px;
+    cursor: pointer;
+    user-select: none;
+    transition: background-color 0.2s ease;
+}
+
+.nodeContent:hover {
+    background-color: var(--ifm-hover-overlay);
+}
+
+.directory {
+    font-weight: 500;
+    color: var(--ifm-color-emphasis-800);
+}
+
+.file {
+    color: var(--ifm-color-emphasis-700);
+}
+
+.selected {
+    background-color: var(--ifm-color-primary-lightest) !important;
+    color: var(--ifm-color-primary-darkest);
+}
+
+.expandIcon,
+.fileIcon {
+    display: inline-block;
+    margin-right: 8px;
+    width: 16px;
+    text-align: center;
+    font-size: 14px;
+}
+
+.nodeName {
+    flex: 1;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.children {
+    border-left: 1px solid var(--ifm-color-emphasis-200);
+    margin-left: 8px;
+}
+
+.fileContent {
+    border-top: 1px solid var(--ifm-color-emphasis-200);
+    margin: 8px 0 0 0;
+}
+
+.fileContentPre {
+    margin: 0;
+    overflow-x: auto;
+    font-size: 13px;
+    /* Remove background and border-radius as they'll be handled by prism-react-renderer */
+}
+
+/* Override prism theme styles to match Docusaurus better */
+.fileContentPre pre {
+    margin: 0;
+    padding: 1rem;
+    font-family: var(--ifm-font-family-monospace);
+    font-size: 13px;
+    line-height: 1.5;
+}
+
+.sidePanel {
+    flex: 2;
+    display: flex;
+    flex-direction: column;
+    background: var(--ifm-background-surface-color);
+    height: 100%;
+    min-height: 0;
+}
+
+.sidePanelHeader {
+    display: flex;
+    align-items: center;
+    padding: 12px 16px;
+    background: var(--ifm-color-emphasis-100);
+    font-weight: 500;
+    flex-shrink: 0;
+}
+
+.fileName {
+    margin-left: 8px;
+    color: var(--ifm-color-emphasis-800);
+}
+
+.sidePanelContent {
+    flex: 1;
+    overflow: auto;
+    padding: 0;
+    min-height: 0;
+}
+
+.sidePanelContent .fileContentPre {
+    height: auto;
+    border-radius: 0;
+    border: none;
+    margin: 0;
+    min-height: 100%;
+}
+
+.noContent {
+    padding: 2rem;
+    text-align: center;
+    color: var(--ifm-color-emphasis-600);
+}
+
+.noContent p {
+    margin: 0.5rem 0;
+}
+
+/* Dark mode adjustments */
+[data-theme='dark'] .children {
+    border-color: var(--ifm-color-emphasis-300);
+}
+
+[data-theme='dark'] .fileContent {
+    border-color: var(--ifm-color-emphasis-300);
+}
+
+[data-theme='dark'] .sidePanelHeader {
+    background: var(--ifm-color-emphasis-200);
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+    .fileTreeContainer {
+        flex-direction: column;
+        height: auto;
+        max-height: none;
+    }
+
+    .fileTreePanel {
+        max-width: none;
+        border-bottom: 1px solid var(--ifm-color-emphasis-300);
+        max-height: 300px;
+    }
+
+    .sidePanel {
+        min-height: 400px;
+        height: auto;
+    }
+}
+
+/* Custom scrollbar for webkit browsers */
+.fileTree::-webkit-scrollbar,
+.fileTreePanel::-webkit-scrollbar,
+.sidePanelContent::-webkit-scrollbar {
+    width: 8px;
+}
+
+.fileTree::-webkit-scrollbar-track,
+.fileTreePanel::-webkit-scrollbar-track,
+.sidePanelContent::-webkit-scrollbar-track {
+    background: var(--ifm-scrollbar-track-color);
+    border-radius: 4px;
+}
+
+.fileTree::-webkit-scrollbar-thumb,
+.fileTreePanel::-webkit-scrollbar-thumb,
+.sidePanelContent::-webkit-scrollbar-thumb {
+    background: var(--ifm-scrollbar-thumb-color);
+    border-radius: 4px;
+    border: 2px solid transparent;
+    background-clip: content-box;
+}
+
+.fileTree::-webkit-scrollbar-thumb:hover,
+.fileTreePanel::-webkit-scrollbar-thumb:hover,
+.sidePanelContent::-webkit-scrollbar-thumb:hover {
+    background: var(--ifm-scrollbar-thumb-hover-color);
+    background-clip: content-box;
+}
+
+/* Firefox scrollbar styling */
+.fileTree,
+.fileTreePanel,
+.sidePanelContent {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ifm-scrollbar-thumb-color) var(--ifm-scrollbar-track-color);
+}

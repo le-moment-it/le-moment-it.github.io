@@ -1,0 +1,506 @@
+---
+sidebar_position: 4
+title: Golden Images
+description: Golden Images - Concepts and challenges
+---
+
+import Terminal from '@site/src/components/Terminal';
+import Admonition from '@theme/Admonition';
+import FileTree from '@site/src/components/Filetree';
+
+## Introduction
+
+When our infrastructure relies on virtual machines created dynamically according to load or traffic received by an application, we need to provide a virtual machine template that will be instantiated. 
+
+This virtual machine template is called a **Golden Image**.
+
+In this documentation, we will explore the requirements for creating a reliable `golden image` and the challenges that need to be addressed.
+
+## Golden images
+
+In this section, we will define how to create a reliable, scalable, and flexible golden image.
+
+### Maintainability
+
+The first challenge we encounter when creating a maintainable golden image is determining how, after the initial build, we will be able to update this image in the future.
+
+The best solution to address this challenge is to build the image using infrastructure as code technologies. Defining your golden images using infrastructure as code provides the following advantages:
+
+- Readable definition of the golden image configuration
+- Reproducible configuration
+- Using `git`, configuration is versioned and updatable
+
+### Environment agnostic
+
+In most system infrastructures, there are multiple environments (`production`, `qa`, `integration`, etc.). To ensure that your golden image works as well in `production` as it does in your other environments, you need to create an `environment agnostic` golden image.
+
+Having an environment agnostic golden image means that your golden image does not contain any information specific to an environment. Therefore, this golden image can be deployed across all your environments.
+
+:::info
+When you have multiple environments, it is crucial to deploy the **same** golden image across all of them. Having duplicated golden images (one per environment) often leads to mistakes and configuration drift between your environments.
+Sharing golden images can be challenging when using public clouds (especially when environments are completely separated. However, having a shared resource environment where you can create this `golden image` for all your environments will elevate your infrastructure to the next level).
+:::
+
+This is how a typical `golden image` infrastructure is designed:
+
+![Overview](/img/architecture/system-network/golden-image/golden-image.drawio.svg)
+
+Let's break this down:
+
+    1. A `VCS` (in this example GitLab) builds the image and publishes it to your public cloud.
+
+:::info
+Let's say that this image has been deployed in `dev` and `qa`
+:::
+
+    2. Suddenly, a lot of traffic/load is received on your production environment and the horizontal scale-up threshold has been reached: **A new virtual machine must be created**
+    The load balancer will, using IAM roles, gain access to the shared image. 
+    
+    3. The load balancer creates a virtual machine instance of this image and adds it to its pool.
+
+:::success
+The infrastructure has been **horizontally scaled up successfully**.
+:::
+
+### Configurable startup/warming commands
+
+The last but equally important aspect of a golden image is how we will start the virtual machine that instantiates this image. To explain this point, let's consider an example.
+
+> In your `production` environment you have already deployed 3 virtual machines that serve your web application. Your web application is constantly evolving and its deployment is automated on the servers available in your pool.
+When your infrastructure is horizontally scaled, you want your new virtual machine to have the **same version** of the application as the other machines in the pool.
+To achieve this, you have two solutions:
+
+- **NOT RECOMMENDED**: Each time your development team releases a new version of the application, you could build a new version of your golden image and upload this new application version inside the image.
+
+:::warning Why it is not recommended 👆
+Technically speaking, it is possible. However, building a new golden image **takes a very long time** (this aspect will be detailed later) and will **significantly** slow down your release workflow.
+:::
+
+- **RECOMMENDED**: You may want to define proper **startup/warming commands**. These commands are all actions that will be performed by a newly instantiated machine when it starts, before it accepts traffic from your load balancer. This is often called `bootstrap commands` or `user-data` (AWS terminology).
+
+>    In our example, we could imagine that, as `startup/warming` commands, our newly created machine will:
+>        - Pull the latest version of the application from a VCS and copy it to a specific local folder
+>        - Initialize monitoring tools
+>        - ...
+>        - Start the web server service.
+
+Having `flexible` and `reusable` startup commands allows your golden images to adapt to many use cases without the burden of recreating new ones.
+
+## Golden image creation 
+
+:::note
+Many tools exist that allow you to create `golden images`. However, in this article, I will only present tools that have become standard due to their popularity.
+:::
+
+To create a golden image you can use: [Hashicorp Packer](https://developer.hashicorp.com/packer)
+
+### A quick overview of Packer
+
+Before moving forward with configuration examples, let's dive into how `packer` actually works. The Packer workflow has 3 steps:
+
+  1. Machine initialization: Packer will initialize a **new temporary virtual machine** with specifications that you define in the `builder` section. Usually, we define:
+        - Resources: CPU/RAM/Disks...
+        - Network: NIC, Network, IP...
+        - Image/ISO: We define which image we start our configuration from. This image represents the configuration of your temporary virtual machine **before any changes are performed on it**. Usually we choose default ISOs that we can find on the web: Debian-13, Windows Server, etc.
+  2. Provisioning: After your new temporary virtual machine has been instantiated in your infrastructure, it is time to configure it so it can become the template you need. Each action performed is called `provisioning`. Provisioning can be either a `bash` or `PowerShell` script, an Ansible playbook, a file copy, etc.
+
+  3. Image preparation: This is the final step, where it stops the temporary virtual machine and performs actions to prepare it according to the `builder` defined. For example, if you want to create a `vSphere virtual machine template`, the machine will be stopped and a snapshot will be taken. Conversely, if you want to create an AWS AMI, your machine will be stopped, a snapshot will be taken, and an AMI will be created from your snapshot.
+
+### Configuration overview
+
+Hashicorp Packer (also called `packer`) is a simple tool that has two main configuration parts (written in HCL language):
+
+  - `Builder`: This part of the `packer` configuration defines what you want to build and how you want to build it.
+  - `Provisioner`: This part defines all actions that you will perform to prepare your machines. You can define one or multiple provisioners that will be executed in order.
+
+
+Let's see an example here:
+
+
+```json
+# Definition of needed plugins
+packer {
+  required_plugins {
+    amazon = {
+      source  = "github.com/hashicorp/amazon"
+      version = "~> 1"
+    }
+  }
+}
+
+# Source definition
+source "amazon-ebs" "ubuntu" {
+  ami_name      = "le-moment-it"
+  instance_type = "t3.micro"
+  region        = "eu-west-1"
+  source_ami_filter {
+    filters = {
+      # Take the latest LTS ubuntu
+      name                = "ubuntu/images/*ubuntu-noble-24.04-amd64-server-*"
+      root-device-type    = "ebs"
+      virtualization-type = "hvm"
+    }
+    most_recent = true
+    owners      = ["099720109477"]
+  }
+  ssh_username = "ubuntu"
+}
+
+build {
+  name    = "le-moment-it"
+  # Reference one or multiple sources
+  sources = [
+    "source.amazon-ebs.ubuntu"
+  ]
+
+# Example of provisionning
+  provisioner "shell" {
+    environment_vars = [
+      "FOO=hello world",
+    ]
+    inline = [
+      "sleep 30",
+      "sudo apt-get update",
+      "sudo apt-get upgrade -y"
+    ]
+  }
+
+}
+```
+
+You can init & build your image :
+
+<Terminal  prompt="packer:~"
+  title="Init & Build"
+  lines={[
+    "packer init .",
+    "packer build ."
+  ]}
+/>
+
+This is the output:
+
+```bash
+le-moment-it.amazon-ebs.ubuntu: output will be in this color.
+
+==> le-moment-it.amazon-ebs.ubuntu: Prevalidating any provided VPC information
+==> le-moment-it.amazon-ebs.ubuntu: Prevalidating AMI Name: le-moment-it
+==> le-moment-it.amazon-ebs.ubuntu: Found Image ID: ami-095c0fee0e8a3c88d
+==> le-moment-it.amazon-ebs.ubuntu: Creating temporary keypair: packer_68e67be5-3470-b337-e281-f9df1cc434d4
+==> le-moment-it.amazon-ebs.ubuntu: Creating temporary security group for this instance: packer_68e67bf0-9401-da4b-bc15-ff987a92dc5d
+==> le-moment-it.amazon-ebs.ubuntu: Authorizing access to port 22 from [0.0.0.0/0] in the temporary security groups...
+==> le-moment-it.amazon-ebs.ubuntu: Launching a source AWS instance...
+==> le-moment-it.amazon-ebs.ubuntu: Instance ID: i-04dccd825c9bb08d8
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for instance (i-04dccd825c9bb08d8) to become ready...
+==> le-moment-it.amazon-ebs.ubuntu: Using SSH communicator to connect: 34.243.72.203
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for SSH to become available...
+==> le-moment-it.amazon-ebs.ubuntu: Connected to SSH!
+==> le-moment-it.amazon-ebs.ubuntu: Provisioning with shell script: /var/folders/y4/pybxh49x3jq09d58n4fz8s1h0000gn/T/packer-shell990784871
+==> le-moment-it.amazon-ebs.ubuntu: Installing Redis
+==> le-moment-it.amazon-ebs.ubuntu: Hit:1 http://eu-west-1.ec2.archive.ubuntu.com/ubuntu noble InRelease
+==> le-moment-it.amazon-ebs.ubuntu: Get:2 http://eu-west-1.ec2.archive.ubuntu.com/ubuntu noble-updates InRelease [126 kB]
+...
+==> le-moment-it.amazon-ebs.ubuntu: Fetched 37.9 MB in 12s (3228 kB/s)
+==> le-moment-it.amazon-ebs.ubuntu: Reading package lists...
+==> le-moment-it.amazon-ebs.ubuntu: Reading package lists...
+==> le-moment-it.amazon-ebs.ubuntu: Building dependency tree...
+==> le-moment-it.amazon-ebs.ubuntu: Reading state information...
+==> le-moment-it.amazon-ebs.ubuntu: Calculating upgrade...
+==> le-moment-it.amazon-ebs.ubuntu: 0 upgraded, 0 newly installed, 0 to remove and 0 not upgraded.
+==> le-moment-it.amazon-ebs.ubuntu: Stopping the source instance...
+==> le-moment-it.amazon-ebs.ubuntu: Stopping instance
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for the instance to stop...
+==> le-moment-it.amazon-ebs.ubuntu: Creating AMI le-moment-it from instance i-04dccd825c9bb08d8
+==> le-moment-it.amazon-ebs.ubuntu: Attaching run tags to AMI...
+==> le-moment-it.amazon-ebs.ubuntu: AMI: ami-xxxxxxxxxxxx
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for AMI to become ready...
+==> le-moment-it.amazon-ebs.ubuntu: Skipping Enable AMI deprecation...
+==> le-moment-it.amazon-ebs.ubuntu: Skipping Enable AMI deregistration protection...
+==> le-moment-it.amazon-ebs.ubuntu: Terminating the source AWS instance...
+==> le-moment-it.amazon-ebs.ubuntu: Cleaning up any extra volumes...
+==> le-moment-it.amazon-ebs.ubuntu: No volumes to clean up, skipping
+==> le-moment-it.amazon-ebs.ubuntu: Deleting temporary security group...
+==> le-moment-it.amazon-ebs.ubuntu: Deleting temporary keypair...
+Build 'le-moment-it.amazon-ebs.ubuntu' finished after 7 minutes 7 seconds.
+
+==> Wait completed after 7 minutes 7 seconds
+
+==> Builds finished. The artifacts of successful builds are:
+--> le-moment-it.amazon-ebs.ubuntu: AMIs were created:
+eu-west-1: ami-0ce5xxxxxxxxxxxxx
+```
+
+As you can see, an image had been created with the ami id : `ami-0ce5xxxxxxxxxxxxx`. However, this image does not do much. Let's change its provisionners.
+
+### Provisioning
+
+There are 2 types of provisioners in Packer:
+
+  - [The official provisioners](https://developer.hashicorp.com/packer/docs/provisioners)
+  - [The community provisioners](https://developer.hashicorp.com/packer/integrations?components=provisioner&tiers=official,partner,community)
+
+
+As I mentioned above, when it comes to configuration, I prefer using infrastructure as code technologies. That's why I often use the [Ansible provisioner](https://developer.hashicorp.com/packer/integrations/hashicorp/ansible).
+
+<Admonition type="note" icon="💡" title="But also ...">
+  You may also want to minimize the number of tools that you use to configure your golden image. In that case, you can use native provisioners such as [shell](https://developer.hashicorp.com/packer/docs/provisioners/shell) or [powershell](https://developer.hashicorp.com/packer/docs/provisioners/powershell)
+</Admonition>
+
+Let's create a simple Ansible playbook to install `nginx`. Our playbook will:
+
+1. Install `nginx` using `apt` packages
+2. Create the folder that will host the website
+3. Create a simple `nginx` vhost
+4. Create a warming script (using crontab) to download the latest version of the website from S3
+
+:::warning
+This is an example playbook. **DO NOT use it in `production`**
+:::
+
+export const packer = (() => {
+const playbook = `
+- name: Run Ansible
+  hosts: all
+  tasks:
+  - name: Install nginx
+    ansible.builtin.apt:
+      name: "{{ item }}"
+      state: present
+      update_cache: true
+    become: true
+    loop:
+      - nginx
+
+  - name: Create website folder
+    ansible.builtin.file:
+      path: /var/www/example.com/
+      state: directory
+      owner: www-data
+      group: www-data
+      mode: 0750
+    become: true
+
+  - name: Copy dummy configuration
+    ansible.builtin.copy:
+      dest: /etc/nginx/sites-available/example.com
+      content: |
+        server {
+                listen 80 default_server;
+                listen [::]:80 default_server;
+                root /var/www/example.com/;
+                index index.html index.htm index.nginx-debian.html;
+                server_name example.com www.example.com;
+                location / {
+                        try_files $uri $uri/ =404;
+                }
+        }
+      owner: root
+      group: root
+      mode: 0750
+    become: true
+
+  - name: Create the warming command
+    ansible.builtin.cron:
+      name: "Download website at startup"
+      special_time: reboot
+      job: |
+        aws s3 cp s3://example.com/ /var/www/example.com/ --recursive
+    become: true
+`.trim();
+
+const packer = `
+packer {
+  required_plugins {
+    amazon = {
+      source  = "github.com/hashicorp/amazon"
+      version = "~> 1"
+    }
+  }
+}
+
+source "amazon-ebs" "ubuntu" {
+  ami_name      = "le-moment-it"
+  instance_type = "t3.micro"
+  region        = "eu-west-1"
+  force_deregister      = true
+  force_delete_snapshot = true
+  source_ami_filter {
+    filters = {
+      name = "ubuntu/images/*ubuntu-noble-24.04-amd64-server-*"
+      root-device-type    = "ebs"
+      virtualization-type = "hvm"
+    }
+    most_recent = true
+    owners      = ["099720109477"]
+  }
+  ssh_username = "ubuntu"
+}
+
+build {
+  name    = "le-moment-it"
+  sources = [
+    "source.amazon-ebs.ubuntu"
+  ]
+
+  provisioner "ansible" {
+    playbook_file = "./nginx.yml"
+  }
+
+}
+`.trim();
+
+return [
+    {
+      name: 'packer',
+      type: 'directory',
+      children: [
+          { name: 'nginx.yml', type: 'file', content: playbook , language: 'yaml'},
+          { name: 'packer.pkr.hcl', type: 'file', content: packer , language: 'json'},
+      ],
+    }
+  ];
+})();
+
+<FileTree
+  data={packer}
+  showSidePanel
+  defaultExpanded={true}
+  defaultOpenFile="nginx.yml"
+/>
+
+You can now launch packer :
+
+<Terminal  prompt="packer:~"
+  title="Init & Build"
+  lines={[
+    "packer build ."
+  ]}
+/>
+
+This is the result :
+
+```bash
+le-moment-it.amazon-ebs.ubuntu: output will be in this color.
+
+==> le-moment-it.amazon-ebs.ubuntu: Force Deregister flag found, skipping prevalidating AMI Name
+==> le-moment-it.amazon-ebs.ubuntu: Found Image ID: ami-095c0fee0e8a3c88d
+==> le-moment-it.amazon-ebs.ubuntu: Creating temporary keypair: packer_68e695fb-117f-8f9f-e0b8-a9b63bbd0e18
+==> le-moment-it.amazon-ebs.ubuntu: Creating temporary security group for this instance: packer_68e695fe-00eb-a9da-e316-b4bb21c61bc3
+==> le-moment-it.amazon-ebs.ubuntu: Authorizing access to port 22 from [0.0.0.0/0] in the temporary security groups...
+==> le-moment-it.amazon-ebs.ubuntu: Launching a source AWS instance...
+==> le-moment-it.amazon-ebs.ubuntu: Instance ID: i-053304fe085e73c83
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for instance (i-053304fe085e73c83) to become ready...
+==> le-moment-it.amazon-ebs.ubuntu: Using SSH communicator to connect: 63.35.251.183
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for SSH to become available...
+==> le-moment-it.amazon-ebs.ubuntu: Connected to SSH!
+==> le-moment-it.amazon-ebs.ubuntu: Provisioning with Ansible...
+==> le-moment-it.amazon-ebs.ubuntu: Setting up proxy adapter for Ansible....
+==> le-moment-it.amazon-ebs.ubuntu: Executing Ansible: ansible-playbook -e packer_build_name="ubuntu" -e packer_builder_type=amazon-ebs --ssh-extra-args '-o IdentitiesOnly=yes' -e ansible_ssh_private_key_file=/var/folders/y4/pybxh49x3jq09d58n4fz8s1h0000gn/T/ansible-key3680864100 -i /var/folders/y4/pybxh49x3jq09d58n4fz8s1h0000gn/T/packer-provisioner-ansible1033555080 /Users/vasseurlaurent/Documents/Tests/Packer/nginx.yml
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: PLAY [Run Ansible] *************************************************************
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: TASK [Gathering Facts] *********************************************************
+==> le-moment-it.amazon-ebs.ubuntu: [WARNING]: Platform linux on host default is using the discovered Python
+==> le-moment-it.amazon-ebs.ubuntu: interpreter at /usr/bin/python3.12, but future installation of another Python
+==> le-moment-it.amazon-ebs.ubuntu: interpreter could change the meaning of that path. See
+==> le-moment-it.amazon-ebs.ubuntu: https://docs.ansible.com/ansible-
+==> le-moment-it.amazon-ebs.ubuntu: core/2.17/reference_appendices/interpreter_discovery.html for more information.
+==> le-moment-it.amazon-ebs.ubuntu: ok: [default]
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: TASK [Install nginx] ***********************************************************
+==> le-moment-it.amazon-ebs.ubuntu: changed: [default] => (item=nginx)
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: TASK [Create website folder] ***************************************************
+==> le-moment-it.amazon-ebs.ubuntu: changed: [default]
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: TASK [Copy dummy configuration] ************************************************
+==> le-moment-it.amazon-ebs.ubuntu: changed: [default]
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: TASK [Create the warming command] **********************************************
+==> le-moment-it.amazon-ebs.ubuntu: changed: [default]
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: PLAY RECAP *********************************************************************
+==> le-moment-it.amazon-ebs.ubuntu: default                    : ok=5    changed=4    unreachable=0    failed=0    skipped=0    rescued=0    ignored=0
+==> le-moment-it.amazon-ebs.ubuntu:
+==> le-moment-it.amazon-ebs.ubuntu: Stopping the source instance...
+==> le-moment-it.amazon-ebs.ubuntu: Stopping instance
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for the instance to stop...
+==> le-moment-it.amazon-ebs.ubuntu: Deregistered AMI le-moment-it, id: ami-0ce538d6e9a52315a
+==> le-moment-it.amazon-ebs.ubuntu: Deleted snapshot: snap-0ab071d0f069d1867
+==> le-moment-it.amazon-ebs.ubuntu: Creating AMI le-moment-it from instance i-053304fe085e73c83
+==> le-moment-it.amazon-ebs.ubuntu: Attaching run tags to AMI...
+==> le-moment-it.amazon-ebs.ubuntu: AMI: ami-xxxxxxxxxxxx
+==> le-moment-it.amazon-ebs.ubuntu: Waiting for AMI to become ready...
+==> le-moment-it.amazon-ebs.ubuntu: Skipping Enable AMI deprecation...
+==> le-moment-it.amazon-ebs.ubuntu: Skipping Enable AMI deregistration protection...
+==> le-moment-it.amazon-ebs.ubuntu: Terminating the source AWS instance...
+==> le-moment-it.amazon-ebs.ubuntu: Cleaning up any extra volumes...
+==> le-moment-it.amazon-ebs.ubuntu: No volumes to clean up, skipping
+==> le-moment-it.amazon-ebs.ubuntu: Deleting temporary security group...
+==> le-moment-it.amazon-ebs.ubuntu: Deleting temporary keypair...
+Build 'le-moment-it.amazon-ebs.ubuntu' finished after 6 minutes 43 seconds.
+
+==> Wait completed after 6 minutes 43 seconds
+
+==> Builds finished. The artifacts of successful builds are:
+--> le-moment-it.amazon-ebs.ubuntu: AMIs were created:
+eu-west-1: ami-XXXXXXXXXX
+```
+
+If you are already familiar with `ansible`, you will recognize that, after the temporary machine launched, the machine was configured with our Ansible playbook.
+
+As soon as a new machine is instantiated with this golden image, it will automatically download the website from S3 and will be ready to serve traffic 🚀
+
+## Challenges
+
+Creating golden images is excellent, but it presents many challenges that need to be overcome. Let's list these challenges in this section.
+
+### Build/Development time
+
+The first, and most obvious challenge we face when we start working with golden image creation is the time needed to create an image.
+
+In the previous example, the building time was **around 7 minutes** (for an image without extensive configuration)
+
+```bash
+==> Wait completed after 6 minutes 43 seconds
+```
+
+Let's be clear: **We cannot reduce this time**.
+
+Having such a long building time will significantly increase your "development time". By "development time", I mean the time that you will need to write the configuration and test it. If your development workflow is:
+
+- I create a piece of configuration
+- I launch a `packer build`
+- I wait for the build...
+- There is an error: I read the error message
+- I fix the piece of configuration
+- I launch a `packer build`
+- ... 
+
+You will **lose a lot of time**.
+
+I **highly recommend** that you create a test environment where you will be able to reproduce the provisioning of your temporary machine without any delay. This will help you test and fix configuration issues more quickly during your development time.
+After you are confident that your provisioning workflow is working as expected, you may launch a new `packer build` to finally get your golden image.
+
+:::info
+The best example of a tool that helps reduce the "development time" of a golden image using Ansible is [Ansible Molecule](https://ansible.readthedocs.io/projects/molecule/). Molecule is a testing tool that can help you create a scenario where you will be able to deploy your playbook multiple times without having to recreate a new machine.
+A dedicated article on Ansible Role with Molecule will be created on this website in the future.
+:::
+
+### Image testing
+
+When you develop a new golden image, you might want to test that this image meets your needs. To do so, you can create multiple types of tests:
+
+- Integration tests: Even though `packer` is not designed to perform tests, you may want to add integration tests inside your building process to ensure the quality of your golden image. A simple way to add them is to create an Ansible playbook, which will be called with the `ansible provisioner` (in last position) that will perform readable and understandable tests for you.
+
+:::info
+By default, Ansible allows you to easily perform tests with modules such as [ansible.builtin.assert](https://docs.ansible.com/ansible/latest/collections/ansible/builtin/assert_module.html)
+:::
+
+- End to End (often called E2E) tests: These tests can be implemented only if your golden image is deployed in one of your testing environments.
+
+## Conclusion
+
+Golden images are key resources when you want to deploy virtual machines dynamically using a horizontal scaling system (such as AWS Auto Scaling Groups). However, their development can be a tedious task.
+
+Creating an efficient golden image development process through infrastructure as code is required to ensure the reusability and maintainability of your golden images.
