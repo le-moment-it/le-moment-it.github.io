@@ -11,7 +11,7 @@ When designing a new system infrastructure or migrating an existing one, you may
 In this documentation, I present a simple yet effective architecture known as the Three-tier infrastructure.
 
 :::note
-The `Three tier infrastructure` is an entry-level architecture suitable for small to medium-sized infrastructures without environment isolation. If you require environment isolation or have more complex needs, please refer to the [Hub And Spoc Infrastructure](./hub-and-spoc.mdx)
+The `Three tier infrastructure` is an entry-level architecture suitable for small to medium-sized infrastructures without environment isolation. If you require environment isolation or have more complex needs, please refer to the [Hub And Spoke Infrastructure](./hub-and-spoke.mdx)
 :::
 
 ## Tiers descriptions
@@ -19,12 +19,12 @@ The `Three tier infrastructure` is an entry-level architecture suitable for smal
 The three-tier infrastructure is built around three tiers, each serving a distinct purpose.
 
 - **Public tier** (Also called `DMZ`) : This is the layer exposed to the internet. It typically includes one or more subnets that host services publicly accessible from the internet. These services act as the first line of defense, protecting the inner tiers.
-Common components deployed here include:
+  Common components deployed here include:
 
   - Loadbalancer / Reverse proxies
   - Firewalls
   - VPNs
-  ... 
+    ...
 
 - **Private/Application tier** : The second tier hosts your application servers. These are typically services that interact with or serve content to the public tier. Any service that does not contain sensitive data (such as databases) should be deployed here.
 
@@ -33,7 +33,6 @@ Common components deployed here include:
 Here’s how this architecture can be visualized, with example services deployed:
 
 ![Three tier](/img/architecture/system-network/three-tier/introduction.drawio.svg)
-
 
 :::note A quick word about subnets
 In the diagram above, subnet configuration within each tier is not detailed.
@@ -49,7 +48,7 @@ Let’s explore the main advantages and limitations of the three-tier architectu
 #### Simple implementation
 
 The three-tier model is one of the simplest architectures to deploy. It requires minimal networking expertise and can scale easily with little maintenance effort.
-Many Infrastructure as Code (IaC) tools, such as Terraform, provide [ready-to-use modules]((https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest)) to quickly create a three-tier network. For example:
+Many Infrastructure as Code (IaC) tools, such as Terraform, provide [ready-to-use modules](<(https://registry.terraform.io/modules/terraform-aws-modules/vpc/aws/latest)>) to quickly create a three-tier network. For example:
 
 ```hcl title="VPC module instanciation"
 module "vpc" {
@@ -83,12 +82,10 @@ Overall cost mainly depends on your use of cloud resources rather than the archi
 The three-tier architecture provides a secure default framework for structuring your network.
 By applying the principle of least privilege — allowing each tier to access only what is strictly necessary — you significantly reduce exposure to common external threats like port scanning or brute-force attacks.
 
-
 :::note Cloud integration
 In some cloud platforms, you can connect external services to your internal network without using public endpoints.
 For example, in AWS, instances within a VPC can access S3 buckets securely using [VPC gateway endpoints](https://docs.aws.amazon.com/vpc/latest/privatelink/gateway-endpoints.html), which further strengthens network security.
 :::
-
 
 ### Limitations
 
@@ -101,17 +98,17 @@ If a misconfiguration or incident occurs, it may affect the entire infrastructur
 
 :::note
 To achieve true environment isolation, each environment should have its own independent three-tier infrastructure.
-This approach is discussed in the next article : [Hub & Spoc Architecture](./hub-and-spoc.mdx)
+This approach is discussed in the next article : [Hub & Spoke Architecture](./hub-and-spoke.mdx)
 :::
 
 #### No dedicated shared resources
 
 Building on the previous limitation, this architecture does not easily support shared services that span multiple environments.
 
-  - Monitoring
-  - VCS
-  - Container registry
-  - ...
+- Monitoring
+- VCS
+- Container registry
+- ...
 
 #### Scaling
 

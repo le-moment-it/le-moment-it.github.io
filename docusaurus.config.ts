@@ -21,7 +21,7 @@ const config: Config = {
   // GitHub pages deployment config.
   // If you aren't using GitHub pages, you don't need these.
   organizationName: 'le-moment-it', // Usually your GitHub org/user name.
-  projectName: 'website', // Usually your repo name.
+  projectName: 'le-moment-it.github.io', // Usually your repo name.
   trailingSlash: false,
   onBrokenLinks: 'warn',
   onBrokenMarkdownLinks: 'warn',
@@ -194,6 +194,10 @@ const config: Config = {
             {
               label: 'Kubernetes',
               to: 'docs/infrastructure/kubernetes/intro',
+            },
+            {
+              label: 'Authentication',
+              to: 'docs/category/authentication',
             },
           ],
         },
