@@ -110,6 +110,48 @@ Tasks are defined in `.vscode/tasks.json`.
 Once defined, these tasks are accessible to everyone via **Terminal → Run Task** (or `Ctrl+Shift+P` → `Tasks: Run Task`). No need to remember the exact command or open a terminal manually.
 
 
+### Shared scripts
+
+In the context of a **monorepo**, a good practice is to define a dedicated `scripts/` folder at the workspace level — typically next to the `.code-workspace` file — and store reusable shell scripts there.
+
+```
+workspaces/
+├── my-project.code-workspace
+└── scripts/
+    ├── example.sh
+    └── setup.sh
+```
+
+Tasks can then reference these shared scripts using `bash` as the command and passing the script path as an argument. The `${workspaceFolder}` variable resolves to the folder of the current root, so `../workspaces/scripts/` navigates up to the shared location:
+
+```json title=".code-workspace → tasks"
+{
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Example",
+        "type": "shell",
+        "command": "bash",
+        "args": ["${workspaceFolder}/../workspaces/scripts/example.sh"],
+        "group": "build",
+        "presentation": {
+          "echo": false,
+          "reveal": "always",
+          "focus": true,
+          "panel": "shared",
+          "showReuseMessage": false,
+          "clear": true
+        },
+        "problemMatcher": []
+      }
+    ]
+  }
+}
+```
+
+This approach keeps scripts **versioned, centralised, and shareable** across every service in the monorepo. Any developer opening their workspace automatically gets access to the full set of shared scripts without any extra setup.
+
 ### Other examples : DevOps Tasks
 
 Tasks are not limited to application code. A DevOps engineer can commit tasks that wrap infrastructure commands, making them accessible to the whole team without requiring everyone to know the exact CLI flags:
