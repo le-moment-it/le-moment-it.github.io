@@ -132,74 +132,14 @@ const config: Config = {
       },
       items: [
         {
-          type: 'dropdown',
           label: 'DevOps',
+          to: 'docs/category/tools--systems',
           position: 'left',
-          items: [
-            {
-              label: 'Planning',
-              to: 'docs/devops/plan/intro',
-            },
-            {
-              label: 'Coding',
-              to: 'docs/devops/code/intro',
-            },
-            {
-              label: 'Building',
-              to: 'docs/devops/build/intro',
-            },
-            {
-              label: 'Testing',
-              to: 'docs/devops/test/intro',
-            },
-            {
-              label: 'Release',
-              to: 'docs/devops/release/intro',
-            },
-            {
-              label: 'Deploy',
-              to: 'docs/devops/deploy/intro',
-            },
-            {
-              label: 'Operate',
-              to: 'docs/devops/operate/intro',
-            },
-            {
-              label: 'Monitor',
-              to: 'docs/devops/monitor/intro',
-            },
-            {
-              label: 'Tools & Systems',
-              to: 'docs/category/tools--systems',
-            },
-          ],
         },
         {
-          type: 'dropdown',
           label: 'Infrastructure',
+          to: 'docs/category/authentication',
           position: 'left',
-          items: [
-            {
-              label: 'Computing',
-              to: 'docs/infrastructure/computing/intro',
-            },
-            {
-              label: 'Data store',
-              to: 'docs/infrastructure/data-store/intro',
-            },
-            {
-              label: 'Network',
-              to: 'docs/infrastructure/network/intro',
-            },
-            {
-              label: 'Kubernetes',
-              to: 'docs/infrastructure/kubernetes/intro',
-            },
-            {
-              label: 'Authentication',
-              to: 'docs/category/authentication',
-            },
-          ],
         },
         {
           type: 'dropdown',
@@ -216,25 +156,6 @@ const config: Config = {
             }
           ],
         },
-
-        // {
-        //   type: 'docSidebar',
-        //   sidebarId: 'devopsSidebar',
-        //   position: 'left',
-        //   label: 'DevOps'
-        // },
-        // {
-        //   type: 'docSidebar',
-        //   sidebarId: 'infrastructureSidebar',
-        //   position: 'left',
-        //   label: 'Infrastructure',
-        // },
-        // {
-        //   type: 'docSidebar',
-        //   sidebarId: 'tutorialSidebar',
-        //   position: 'left',
-        //   label: 'Architecture',
-        // },
         {
           type: 'dropdown',
           label: 'Security',
@@ -247,7 +168,6 @@ const config: Config = {
           ]
         },
         { to: '/ai', label: 'AI', position: 'left' },
-        { to: '/blog', label: 'PoC & Tools', position: 'left' },
         {
           type: 'search',
           position: 'right',
@@ -263,41 +183,11 @@ const config: Config = {
       style: 'dark',
       links: [
         {
-          title: 'Docs',
-          items: [
-            {
-              label: 'Tutorial',
-              to: '/docs/intro',
-            },
-          ],
-        },
-        {
-          title: 'Community',
-          items: [
-            {
-              label: 'Stack Overflow',
-              href: 'https://stackoverflow.com/questions/tagged/docusaurus',
-            },
-            {
-              label: 'Discord',
-              href: 'https://discordapp.com/invite/docusaurus',
-            },
-            {
-              label: 'X',
-              href: 'https://x.com/docusaurus',
-            },
-          ],
-        },
-        {
           title: 'More',
           items: [
             {
-              label: 'Blog',
-              to: '/blog',
-            },
-            {
               label: 'GitHub',
-              href: 'https://github.com/facebook/docusaurus',
+              href: 'https://github.com/le-moment-it/website',
             },
           ],
         },
