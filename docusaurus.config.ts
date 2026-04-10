@@ -132,9 +132,19 @@ const config: Config = {
       },
       items: [
         {
+          type: 'dropdown',
           label: 'DevOps',
-          to: 'docs/category/tools--systems',
           position: 'left',
+          items: [
+            {
+              label: 'Code',
+              to: 'docs/category/code',
+            },
+            {
+              label: 'Tools & Systems',
+              to: 'docs/category/tools--systems',
+            },
+          ],
         },
         {
           label: 'Infrastructure',

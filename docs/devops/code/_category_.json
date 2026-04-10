@@ -1,0 +1,8 @@
+{
+    "label": "Code",
+    "position": 1,
+    "link": {
+        "type": "generated-index",
+        "description": "Best practices and tooling for writing and sharing code across your team."
+    }
+}

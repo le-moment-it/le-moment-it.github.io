@@ -1,0 +1,317 @@
+---
+sidebar_position: 1
+title: VS Code Workspace
+description: Standardize your development environment across your team with VS Code Workspaces
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+import FileTree from '@site/src/components/Filetree';
+
+## Context
+
+One of the most underrated sources of friction in a software team is the **"works on my machine"** problem. Two developers working on the same codebase often end up with different formatter configurations, different linting rules enabled, different sets of extensions installed, and different commands to run the project. This leads to:
+
+- Code reviews polluted by inconsistent formatting
+- Bugs that only reproduce in certain environments
+- Onboarding friction for new team members
+- Tribal knowledge locked in Slack messages ("just run `make dev` but first you need to export `FOO=bar`...")
+
+The fix is not a wiki page. The fix is **committing your environment configuration directly into the repository**.
+
+VS Code Workspaces provide exactly this: a single `.code-workspace` file (or a `.vscode/` folder) that travels with your code, ensuring every developer — and every DevOps engineer — works with the same tools, the same rules, and the same commands.
+
+:::info
+This article focuses on the **VS Code Workspace** approach. The same philosophy applies to other editors (JetBrains, Neovim, etc.) but the implementation details differ.
+:::
+
+## What Is a VS Code Workspace?
+
+A VS Code workspace is a configuration layer on top of your project. It can be defined in two ways:
+
+- **`.vscode/` folder** — placed at the root of a single-repo project. Contains individual JSON files for settings, tasks, extensions, and launch configurations.
+- **`.code-workspace` file** — a single file that describes a multi-root workspace (multiple folders) and embeds the same settings, tasks, and extension recommendations.
+
+Both approaches work. For most projects, the `.vscode/` folder is the simpler starting point. For monorepos or projects that span multiple directories, a `.code-workspace` file is more appropriate.
+
+<FileTree
+  data={[
+    {
+      type: "directory",
+      name: "my-project",
+      children: [
+        {
+          type: "directory",
+          name: ".vscode",
+          children: [
+            { type: "file", name: "settings.json" },
+            { type: "file", name: "tasks.json" },
+            { type: "file", name: "extensions.json" },
+            { type: "file", name: "launch.json" },
+          ],
+        },
+        { type: "directory", name: "src", children: [] },
+        { type: "file", name: "package.json" },
+      ],
+    },
+  ]}
+/>
+
+All files inside `.vscode/` should be committed to your version control system. They are the shared contract between everyone working on the project.
+
+## Sharing Commands with Tasks
+
+The most impactful feature of VS Code Workspaces is **Tasks**. Tasks let you define a set of shell commands that any team member can run directly from the editor, without having to remember flags, environment variables, or the right working directory.
+
+Tasks are defined in `.vscode/tasks.json`.
+
+### Basic Structure
+
+```json title=".vscode/tasks.json"
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Start dev server",
+      "type": "shell",
+      "command": "npm run dev",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "new"
+      }
+    },
+    {
+      "label": "Run tests",
+      "type": "shell",
+      "command": "npm test",
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      }
+    },
+    {
+      "label": "Lint",
+      "type": "shell",
+      "command": "npm run lint"
+    },
+    {
+      "label": "Format",
+      "type": "shell",
+      "command": "npm run format"
+    }
+  ]
+}
+```
+
+Once defined, these tasks are accessible to everyone via **Terminal → Run Task** (or `Ctrl+Shift+P` → `Tasks: Run Task`). No need to remember the exact command or open a terminal manually.
+
+
+### Other examples : DevOps Tasks
+
+Tasks are not limited to application code. A DevOps engineer can commit tasks that wrap infrastructure commands, making them accessible to the whole team without requiring everyone to know the exact CLI flags:
+
+```json title=".vscode/tasks.json"
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Terraform: init",
+      "type": "shell",
+      "command": "terraform init -backend-config=envs/dev/backend.hcl",
+      "options": {
+        "cwd": "${workspaceFolder}/infra"
+      }
+    },
+    {
+      "label": "Terraform: plan (dev)",
+      "type": "shell",
+      "command": "terraform plan -var-file=envs/dev/terraform.tfvars",
+      "options": {
+        "cwd": "${workspaceFolder}/infra"
+      },
+      "dependsOn": ["Terraform: init"]
+    },
+    {
+      "label": "Docker: build & run",
+      "type": "shell",
+      "command": "docker compose up --build"
+    },
+    {
+      "label": "Ansible: run playbook (dev)",
+      "type": "shell",
+      "command": "ansible-playbook -i inventories/dev site.yml --diff"
+    }
+  ]
+}
+```
+
+:::tip
+Use `${workspaceFolder}` instead of relative paths in your commands. It always resolves to the root of the workspace, regardless of where the developer opened the terminal.
+:::
+
+## Sharing Settings
+
+`.vscode/settings.json` lets you enforce project-level editor settings that override each developer's personal VS Code preferences. This is where you eliminate the "tabs vs. spaces" debate once and for all.
+
+```json title=".vscode/settings.json"
+{
+  // Formatting
+  "editor.formatOnSave": true,
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+
+  // Linting
+  "eslint.validate": ["javascript", "typescript"],
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+
+  // File associations
+  "files.associations": {
+    "*.env.example": "dotenv",
+    "*.hcl": "terraform"
+  },
+
+  // Exclude noisy folders from the file explorer
+  "files.exclude": {
+    "node_modules": true,
+    ".terraform": true,
+    "**/__pycache__": true
+  },
+
+  // Spell checker language (if cSpell extension is installed)
+  "cSpell.language": "en,fr"
+}
+```
+
+These settings apply to everyone who opens the project in VS Code. A developer who has `editor.formatOnSave: false` in their personal settings will have it overridden to `true` for this project — without touching their global configuration.
+
+## Recommending Extensions
+
+`.vscode/extensions.json` lets you declare which extensions your project needs. When a developer opens the workspace for the first time, VS Code will prompt them to install the recommended extensions automatically.
+
+```json title=".vscode/extensions.json"
+{
+  "recommendations": [
+    // Formatting
+    "esbenp.prettier-vscode",
+
+    // Linting
+    "dbaeumer.vscode-eslint",
+
+    // Infrastructure
+    "hashicorp.terraform",
+    "redhat.ansible",
+
+    // Containers
+    "ms-azuretools.vscode-docker",
+    "ms-kubernetes-tools.vscode-kubernetes-tools",
+
+    // Git
+    "eamodio.gitlens",
+    "mhutchie.git-graph",
+
+    // Productivity
+    "streetsidesoftware.code-spell-checker",
+    "gruntfuss.vscode-yaml",
+    "tamasfe.even-better-toml"
+  ]
+}
+```
+
+:::info
+Extensions are only **recommended**, never forced. Developers retain full control over their editor — the workspace simply tells VS Code what would be useful to have.
+:::
+
+
+## Multi-Root Workspaces
+
+For monorepos or projects that span several repositories, a `.code-workspace` file lets you define multiple root folders and apply settings per-folder:
+
+```json title="my-project.code-workspace"
+{
+  "folders": [
+    {
+      "name": "Frontend",
+      "path": "./frontend"
+    },
+    {
+      "name": "Backend",
+      "path": "./backend"
+    },
+    {
+      "name": "Infrastructure",
+      "path": "./infra"
+    }
+  ],
+  "settings": {
+    "editor.formatOnSave": true
+  },
+  "extensions": {
+    "recommendations": [
+      "esbenp.prettier-vscode",
+      "hashicorp.terraform"
+    ]
+  },
+  "tasks": {
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Start all services",
+        "dependsOn": ["Start frontend", "Start backend"],
+        "dependsOrder": "parallel"
+      },
+      {
+        "label": "Start frontend",
+        "type": "shell",
+        "command": "npm run dev",
+        "options": { "cwd": "${workspaceFolder:Frontend}" }
+      },
+      {
+        "label": "Start backend",
+        "type": "shell",
+        "command": "go run ./cmd/api",
+        "options": { "cwd": "${workspaceFolder:Backend}" }
+      }
+    ]
+  }
+}
+```
+
+Notice `${workspaceFolder:Frontend}` — this variable resolves to the path of the folder named `Frontend` in the workspace, making paths unambiguous across roots.
+
+## Summary
+
+<Tabs>
+  <TabItem value="what" label="What to commit">
+
+| File | Purpose |
+|---|---|
+| `.vscode/settings.json` | Formatting, linting, editor behavior |
+| `.vscode/tasks.json` | Shared commands for the whole team |
+| `.vscode/extensions.json` | Extension recommendations |
+| `.vscode/launch.json` | Debug configurations |
+| `*.code-workspace` | Multi-root workspace definition |
+
+  </TabItem>
+  <TabItem value="why" label="Why it matters">
+
+| Problem | Workspace solution |
+|---|---|
+| Inconsistent formatting | `settings.json` enforces formatter & rules on save |
+| "How do I run this?" | `tasks.json` exposes commands in the editor UI |
+| Missing extensions | `extensions.json` prompts installation on first open |
+| Broken debug setup | `launch.json` provides ready-to-use debug configs |
+| Monorepo complexity | `.code-workspace` unifies multiple roots |
+
+  </TabItem>
+</Tabs>
+
+A VS Code Workspace does not replace a `Makefile`, a CI pipeline, or a container. It sits **on top** of these tools and makes them accessible to every developer, regardless of their terminal habits or memory for flags. Think of it as the **developer-facing interface to your project's tooling**.
+
+Commit it. Review it. Keep it up to date. Your future team members will thank you.
