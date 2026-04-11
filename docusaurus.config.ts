@@ -178,9 +178,19 @@ const config: Config = {
           ]
         },
         {
+          type: 'dropdown',
           label: 'Tooling',
-          to: 'docs/tooling/lazygit',
           position: 'left',
+          items: [
+            {
+              label: 'Lazygit',
+              to: 'docs/tooling/lazygit',
+            },
+            {
+              label: 'Atuin',
+              to: 'docs/tooling/atuin',
+            },
+          ],
         },
         { to: '/ai', label: 'AI', position: 'left' },
         {

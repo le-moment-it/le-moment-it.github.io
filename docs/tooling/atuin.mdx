@@ -1,0 +1,297 @@
+---
+sidebar_position: 2
+title: Atuin
+description: Supercharge your shell history with rich metadata, powerful search, and reusable scripts
+displayed_sidebar: toolingSidebar
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Context
+
+The default shell history is a flat list of commands. It tells you *what* you ran but nothing else — no exit code, no duration, no working directory, no context. Finding a command you ran two weeks ago in a specific project folder means scrolling through thousands of unrelated entries with `Ctrl+R`.
+
+**Atuin** ([atuinsh/atuin](https://github.com/atuinsh/atuin)) replaces that flat file with a SQLite database. Every command is stored with rich metadata: exit code, working directory, hostname, session, duration. The interactive search UI lets you filter on all of it in seconds.
+
+Beyond history, Atuin also provides a **scripts** system — a way to store, parameterise, and reuse shell commands across sessions without writing dedicated shell functions or dotfiles.
+
+:::info
+This article focuses on the two features I use daily: **history** and **scripts**. Atuin also offers a sync system to share history across machines — I don't use it, so it is not covered here.
+:::
+
+## Installation
+
+<Tabs>
+  <TabItem value="quick" label="Quick install">
+
+```bash
+curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh
+```
+
+  </TabItem>
+  <TabItem value="mac" label="macOS">
+
+```bash
+brew install atuin
+```
+
+  </TabItem>
+  <TabItem value="linux" label="Linux">
+
+```bash
+# Arch
+pacman -S atuin
+
+# Cargo
+cargo install atuin
+```
+
+  </TabItem>
+</Tabs>
+
+Then add the shell integration to your rc file:
+
+<Tabs>
+  <TabItem value="zsh" label="Zsh">
+
+```bash
+echo 'eval "$(atuin init zsh)"' >> ~/.zshrc
+```
+
+  </TabItem>
+  <TabItem value="bash" label="Bash">
+
+```bash
+echo 'eval "$(atuin init bash)"' >> ~/.bashrc
+```
+
+  </TabItem>
+  <TabItem value="fish" label="Fish">
+
+```bash
+echo 'atuin init fish | source' >> ~/.config/fish/config.fish
+```
+
+  </TabItem>
+</Tabs>
+
+Restart your shell (or `source` the rc file) and Atuin takes over `Ctrl+R` and the Up arrow from that point on.
+
+---
+
+## History
+
+### What gets recorded
+
+For every command you run, Atuin stores:
+
+| Field | Description |
+|---|---|
+| `command` | The full command text |
+| `exit` | Exit code (`0` = success, anything else = failure) |
+| `duration` | How long the command took to run |
+| `cwd` | Working directory at the time of execution |
+| `hostname` | Machine it ran on |
+| `session` | Terminal session identifier |
+| `time` | Timestamp |
+
+This turns your history from a log into a **queryable dataset**.
+
+### Interactive search (TUI)
+
+Press `Ctrl+R` (or the Up arrow) to open the full-screen search UI. It shows exit code, duration, timestamp, and the command for each entry.
+
+Key bindings inside the TUI:
+
+| Key | Action |
+|---|---|
+| Type anything | Filter commands in real time |
+| `Ctrl+R` | Cycle filter mode (global → session → directory) |
+| `Enter` | Execute the selected command |
+| `Tab` | Paste the command into the prompt for editing |
+| `Alt+<num>` | Jump directly to the nth result |
+| `Esc` | Close without executing |
+
+The **filter mode** is one of Atuin's most useful features. Cycling through it with `Ctrl+R` narrows the results to:
+- **Global** — all history from all sessions and directories
+- **Session** — only commands from the current terminal session
+- **Directory** — only commands run from the current working directory
+
+### Searching from the CLI
+
+The `atuin search` command exposes the same data for scripting and inspection:
+
+```bash
+# All failed commands
+atuin search --exit 1
+
+# Successful terraform commands run after yesterday 3pm
+atuin search --exit 0 --after "yesterday 3pm" terraform
+
+# Commands run in the current directory
+atuin search --cwd .
+
+# Human-readable output with duration and timestamps
+atuin search --human terraform
+```
+
+### Listing history with custom formatting
+
+```bash
+# Show time, duration and command (default format)
+atuin history list
+
+# Custom format
+atuin history list --format "{time} [{duration}] {command}"
+
+# Only the commands, no metadata
+atuin history list --cmd-only
+
+# Most recent command
+atuin history last --human
+```
+
+### Statistics
+
+```bash
+# Most used commands, average durations, totals
+atuin stats
+```
+
+Example output:
+
+```
+Total commands:   24,312
+Unique commands:  8,103
+
+top 10 commands:
+  git        3821  (15.7%)
+  ls         2140   (8.8%)
+  cd         1893   (7.8%)
+  kubectl    1205   (5.0%)
+  terraform   987   (4.1%)
+  ...
+```
+
+---
+
+## Scripts
+
+The scripts feature lets you store shell commands in Atuin's database, give them a name, a description, tags, and optionally **template variables**. You can then run them by name from any session, in any directory, without remembering the exact flags.
+
+Think of it as a personal command library — more structured than shell aliases, lighter than writing standalone scripts.
+
+### Creating a script
+
+**From your editor** (default):
+
+```bash
+atuin scripts new my-script
+```
+
+This opens your `$EDITOR` with a template to fill in. The script format is a standard shell script with an optional YAML front-matter block for metadata.
+
+**From a file:**
+
+```bash
+atuin scripts new my-script --script ./my-script.sh
+```
+
+**From the last command(s) in your history:**
+
+```bash
+# Save the last command as a script
+atuin scripts new my-script --last
+
+# Save the last 5 commands as a script
+atuin scripts new my-script --last 5
+```
+
+The `--last` flag is particularly handy: you ran a sequence of commands that worked, and you want to save it for later without retyping anything.
+
+### Template variables
+
+Scripts support `{{variable_name}}` placeholders. When you run a script that contains variables, Atuin either reads them from the `-v` flag or prompts you interactively:
+
+```bash
+#!/bin/bash
+# Description: Deploy a service to a given environment
+# Tags: deploy, infra
+
+kubectl apply -f manifests/{{service}}/{{env}}.yaml
+kubectl rollout status deployment/{{service}} -n {{env}}
+```
+
+Running it:
+
+```bash
+# Pass variables inline
+atuin scripts run deploy-service -v service=api -v env=staging
+
+# Or just run it — Atuin will prompt for each variable
+atuin scripts run deploy-service
+# > service: api
+# > env: staging
+```
+
+### Listing and inspecting scripts
+
+```bash
+# List all scripts (name, tags, description)
+atuin scripts list
+
+# Show script details in YAML
+atuin scripts get my-script
+
+# Show just the executable script content
+atuin scripts get my-script --script
+```
+
+### Editing and organising
+
+```bash
+# Open script in editor
+atuin scripts edit my-script
+
+# Update description or tags only
+atuin scripts edit my-script --description "Updated description"
+
+# Rename
+atuin scripts edit my-script --rename new-name
+
+# Remove all tags
+atuin scripts edit my-script --no-tags
+```
+
+### Deleting
+
+```bash
+atuin scripts delete my-script
+
+# Skip the confirmation prompt
+atuin scripts delete my-script --force
+```
+
+### Practical example
+
+A typical DevOps use case — a parameterised script to tail logs from a Kubernetes pod:
+
+```bash
+#!/bin/bash
+# Description: Tail logs from a pod in a given namespace
+# Tags: kubernetes, logs
+
+kubectl logs -f \
+  -n {{namespace}} \
+  $(kubectl get pods -n {{namespace}} -l app={{app}} -o jsonpath='{.items[0].metadata.name}') \
+  --tail={{lines}}
+```
+
+Save it once with `atuin scripts new k8s-logs`, then run it anywhere:
+
+```bash
+atuin scripts run k8s-logs -v namespace=production -v app=api -v lines=100
+```
+
+No alias in your dotfiles. No standalone script file to maintain. No need to remember the `jsonpath` expression.
