@@ -177,6 +177,11 @@ const config: Config = {
             },
           ]
         },
+        {
+          label: 'Tooling',
+          to: 'docs/tooling/lazygit',
+          position: 'left',
+        },
         { to: '/ai', label: 'AI', position: 'left' },
         {
           type: 'search',

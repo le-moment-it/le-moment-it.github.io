@@ -1,0 +1,8 @@
+{
+    "label": "Tooling",
+    "position": 1,
+    "link": {
+        "type": "generated-index",
+        "description": "A curated list of tools that improve your daily workflow as a developer or DevOps engineer."
+    }
+}

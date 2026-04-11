@@ -1,0 +1,155 @@
+---
+sidebar_position: 1
+title: Lazygit
+description: A terminal UI for Git that makes everyday operations fast, visual, and keyboard-driven
+displayed_sidebar: toolingSidebar
+---
+
+import Tabs from '@theme/Tabs';
+import TabItem from '@theme/TabItem';
+
+## Context
+
+Managing Git from the command line is powerful but verbose. Staging individual hunks, rebasing interactively, resolving conflicts, cherry-picking commits — each operation requires remembering specific flags and subcommands. The alternative, a full GUI client, often means leaving the terminal and losing context.
+
+**Lazygit** sits between the two: a terminal UI that gives you a visual, keyboard-driven interface directly inside your terminal. No mouse required, no context switch.
+
+:::info My benchmark
+I tested seven free Git clients and scored them against a set of criteria that matter in a real DevOps workflow. Lazygit came out on top with **127 points**, well ahead of the second-place GitUI at 86 points. You can read the full comparison here: [What is the best Git client?](https://medium.com/@le_moment_it/what-is-the-best-git-client-3e394c6c1b4d)
+:::
+
+## What is Lazygit?
+
+Lazygit is an open-source terminal UI for Git written in Go. It wraps standard Git commands behind a panel-based interface that you can navigate entirely with the keyboard.
+
+| | |
+|---|---|
+| **Language** | Go |
+| **GitHub stars** | 33k+ |
+| **License** | MIT |
+| **Repository** | [jesseduffield/lazygit](https://github.com/jesseduffield/lazygit) |
+
+The interface is split into five panels — **Status**, **Files**, **Branches**, **Commits**, and **Stash** — each of which exposes contextual keyboard shortcuts. Pressing `?` at any time shows the full list of available actions for the focused panel.
+
+## Installation
+
+<Tabs>
+  <TabItem value="mac" label="macOS">
+
+```bash
+brew install lazygit
+```
+
+  </TabItem>
+  <TabItem value="linux" label="Linux">
+
+```bash
+# Ubuntu / Debian (via PPA)
+add-apt-repository ppa:lazygit-team/release
+apt update && apt install lazygit
+
+# Arch
+pacman -S lazygit
+
+# Or install the binary directly
+LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep '"tag_name"' | sed 's/.*"v\([^"]*\)".*/\1/')
+curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${LAZYGIT_VERSION}/lazygit_${LAZYGIT_VERSION}_Linux_x86_64.tar.gz"
+tar xf lazygit.tar.gz lazygit
+install lazygit -D -t /usr/local/bin/
+```
+
+  </TabItem>
+  <TabItem value="windows" label="Windows">
+
+```bash
+# Via Scoop
+scoop install lazygit
+
+# Via Winget
+winget install -e --id=JesseDuffield.lazygit
+```
+
+  </TabItem>
+</Tabs>
+
+Once installed, open any Git repository and run:
+
+```bash
+lazygit
+```
+
+## Interface Overview
+
+<img src="/img/tooling/lazygit/lazygit.gif" alt="Lazygit interface overview" style={{width: '75%'}} />
+
+The UI is divided into five panels. You switch between them with the arrow keys or the dedicated number key for each panel.
+
+| Panel | Key | What it shows |
+|---|---|---|
+| **Status** | — | Repository info, upstream, recent activity |
+| **Files** | `1` | Working tree — staged and unstaged changes |
+| **Branches** | `2` | Local branches, remotes, tags |
+| **Commits** | `3` | Commit log with diff preview |
+| **Stash** | `4` | Stash entries |
+
+Every panel has its own set of shortcuts. Press `?` inside any panel to see what is available.
+
+## Key Features
+
+### Staging at the Hunk or Line Level
+
+One of the most useful day-to-day features. Instead of staging an entire file, you can stage individual hunks or even single lines — directly from the Files panel.
+
+1. Navigate to a file in the **Files** panel
+2. Press `Enter` to open the diff view
+3. Navigate to a hunk and press `Space` to stage it, or press `v` to select individual lines
+
+This replaces `git add -p`, which achieves the same thing but requires reading prompts and typing `y`/`n` for each hunk.
+
+### Interactive Rebase
+
+Lazygit makes interactive rebase visual. From the **Commits** panel:
+
+1. Navigate to the commit you want to rebase from
+2. Press `e` to start an interactive rebase
+3. Use `d` to drop, `s` to squash, `r` to reword, `f` to fixup — all from the keyboard
+4. Press `m` to confirm and apply
+
+No need to open a text editor to edit the rebase todo list.
+
+### Conflict Resolution
+
+When a merge or rebase produces conflicts, Lazygit shows the conflicting files in the **Files** panel. Select a file, press `Enter`, and you can navigate between conflict markers and pick **ours**, **theirs**, or edit manually — all without leaving the terminal.
+
+### Branch Management
+
+From the **Branches** panel you can:
+
+- Create (`n`), delete (`d`), and rename (`R`) branches
+- Checkout a branch (`Space`)
+- Merge (`M`) or rebase (`r`) the current branch onto the selected one
+- Push (`P`) and pull (`p`) with a single keystroke
+- View the remote branches alongside local ones
+
+### Cherry-Pick
+
+1. Navigate to a commit in the **Commits** panel
+2. Press `c` to copy (cherry-pick) it
+3. Switch to the target branch
+4. Press `v` to paste
+
+Lazygit handles the underlying `git cherry-pick` command and shows the result inline.
+
+### Stash Management
+
+The **Stash** panel lets you push (`s` from the Files panel), pop, apply, and drop stash entries without having to remember `git stash pop stash@{2}`.
+
+## Limitations
+
+No tool is perfect. A few things to be aware of:
+
+- **No application-level Git profiles** — switching between work and personal Git identities still requires manual `git config` changes or a wrapper script
+- **Remote branch deletion** requires an extra confirmation step that can feel slow
+- **Occasional crashes** on very large repositories with thousands of branches (though this has improved significantly in recent versions)
+
+These are minor friction points compared to the overall gain in productivity. They were also factors in my [benchmark scoring](https://medium.com/@le_moment_it/what-is-the-best-git-client-3e394c6c1b4d).
